@@ -12,8 +12,8 @@
       "included_inputs": []
     },
     "citation_verify": {
-      "model_identifier": "stub://citation_verify",
-      "max_tokens": 1024,
+      "model_identifier": "openai://gpt-5.4-nano",
+      "max_tokens": 4096,
       "reasoning_effort": "low",
       "verbosity": "low",
       "included_inputs": []

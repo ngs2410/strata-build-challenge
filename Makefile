@@ -1,4 +1,4 @@
-.PHONY: install test test-cov lint format clean
+.PHONY: install test test-cov lint format clean eval
 
 install:
 	pip install -e '.[dev]'
@@ -19,3 +19,6 @@ format:
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	rm -rf .pytest_cache .ruff_cache .model_cache
+
+eval:
+	env3.12/bin/python -m scripts.main_eval

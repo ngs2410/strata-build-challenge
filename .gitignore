@@ -47,3 +47,6 @@ data/tenants/*/*/extracted_obligations.json
 data/tenants/*/*/mappings.json
 data/tenants/*/*/review_items.json
 data/tenants/*/*/audit_log.jsonl
+
+# Eval-run reports (regenerate via scripts/main_eval.py)
+output/

@@ -1,0 +1,35 @@
+{
+  "cases": [
+    {
+      "case_id": "order-2222-section-g-1-ix",
+      "input": {
+        "docket_number": "RM18-9",
+        "proceeding_id": "ferc-order-2222",
+        "prior_version_id": "nopr-2019-11",
+        "new_version_id": "final-2020-09",
+        "prior_version_file": "data/tenants/verdant_grid/proceedings/order-2222-nopr.txt",
+        "new_version_file": "data/tenants/verdant_grid/proceedings/order-2222-final.txt"
+      },
+      "expected_changes": [
+        {
+          "change_type": "loosened",
+          "prior_passage_position": 1,
+          "new_passage_position": 1,
+          "description_keywords": ["minimum", "size", "100", "kW"]
+        },
+        {
+          "change_type": "tightened",
+          "prior_passage_position": 2,
+          "new_passage_position": 2,
+          "description_keywords": ["60 days", "register"]
+        },
+        {
+          "change_type": "added",
+          "prior_passage_position": null,
+          "new_passage_position": 3,
+          "description_keywords": ["telemetry"]
+        }
+      ]
+    }
+  ]
+}

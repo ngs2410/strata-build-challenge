@@ -304,6 +304,42 @@ def test_verify_citations_short_circuits_when_no_change_has_pending_citation():
   )
 
 
+def test_citation_verify_prompt_has_steps_details_pitfalls_sections():
+  # Match the version_diff prompt scaffolding — the verifier needs a
+  # step-by-step decision procedure, worked examples drawn from adjacent
+  # domains, and explicit pitfalls. The three failure modes we're
+  # teaching against are (a) accepting a topically-adjacent span that
+  # doesn't actually support the claim, (b) rejecting a correct parent-
+  # obligation span on a tightened change's prior_citation, (c)
+  # paraphrasing the description instead of quoting the passage.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  citation = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=29,
+    verified=False,
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
+  )
+  prompt = build_citation_verify_prompt(
+    [_change('tightened', prior_citation=citation)], nopr, final
+  )
+  _, user = prompt.render()
+  assert '## Steps' in user
+  assert '## Details' in user
+  assert '## Pitfalls' in user
+  # Worked examples are drawn from adjacent regulatory domains, NOT the
+  # Order 2222 input itself — same rule as version_diff.
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  assert 'minimum-necessary' in details_section  # HIPAA Example 1
+  assert 'SAR' in details_section  # FinCEN Example 3
+  assert 'DER' not in details_section  # Order 2222 would be teaching-to-test
+  # Pitfalls name the three failure modes.
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'topically relevant' in pitfalls_section
+  assert 'paraphrase' in pitfalls_section.lower()
+
+
 def test_citation_verify_prompt_does_not_leak_structural_metadata():
   # The verifier only needs passage text + citing span + the described
   # shift. Rendering passage_id strings or integer offsets is noise that

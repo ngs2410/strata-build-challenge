@@ -27,6 +27,7 @@ mutants/
 # Environment files
 .env
 .env.*
+!.env.example
 
 # Inference
 .llm_cache

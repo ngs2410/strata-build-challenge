@@ -15,7 +15,7 @@ from src.config import (
   ReviewItem,
   load_domain_config,
 )
-from src.ingest import ingest_verdant_grid_fixture, persist_ingest
+from src.ingest import ingest_tenant_fixture, persist_ingest
 from src.mapping import map_change
 from src.obligation_extraction import extract_obligations
 from src.review_queue import enqueue_mapping
@@ -47,7 +47,7 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
   result = PipelineResult(config=load_domain_config(tenant_id, environment))
 
   logger.info('ingest.start', tenant_id=tenant_id, environment=environment)
-  versions, obligations, projects, documents = ingest_verdant_grid_fixture(tenant_id, environment)
+  versions, obligations, projects, documents = ingest_tenant_fixture(tenant_id, environment)
   result.versions = versions
   result.obligations = obligations
   result.projects = projects

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 import orjson
@@ -9,6 +9,9 @@ from src.stores import DATA_DIR, document_store, obligation_store, proceeding_st
 
 SECTION_HEADER_RE = re.compile(r'^§([\d.]+)((?:\([^)]+\))*)\s')
 SECTION_SUB_RE = re.compile(r'\(([^)]+)\)')
+
+PROCEEDINGS_DIRNAME = 'proceedings'
+PROCEEDINGS_MANIFEST_FILENAME = 'manifest.json'
 
 
 def _passage_id(
@@ -100,31 +103,25 @@ def persist_ingest(
   document_store.save_all(tenant_id, environment, documents)
 
 
-def ingest_verdant_grid_fixture(
+def ingest_tenant_fixture(
   tenant_id: str, environment: str
 ) -> tuple[list[ProceedingVersion], list[Obligation], list[Project], list[Document]]:
-  proceedings_dir = DATA_DIR / tenant_id / 'proceedings'
-  nopr = ingest_proceeding_version(
-    tenant_id=tenant_id,
-    environment=environment,
-    proceeding_id='ferc-order-2222',
-    version_id='nopr-2019-11',
-    status='draft',
-    docket_number='RM18-9',
-    issued_at=datetime(2019, 11, 21, tzinfo=timezone.utc),
-    source_url='https://www.ferc.gov/sites/default/files/2020-06/E-1_0.pdf',
-    text_path=proceedings_dir / 'order-2222-nopr.txt',
-  )
-  final = ingest_proceeding_version(
-    tenant_id=tenant_id,
-    environment=environment,
-    proceeding_id='ferc-order-2222',
-    version_id='final-2020-09',
-    status='final',
-    docket_number='RM18-9',
-    issued_at=datetime(2020, 9, 17, tzinfo=timezone.utc),
-    source_url='https://www.ferc.gov/sites/default/files/2020-09/E-1_0.pdf',
-    text_path=proceedings_dir / 'order-2222-final.txt',
-  )
+  proceedings_dir = DATA_DIR / tenant_id / PROCEEDINGS_DIRNAME
+  manifest_path = proceedings_dir / PROCEEDINGS_MANIFEST_FILENAME
+  manifest = orjson.loads(manifest_path.read_bytes())
+  versions = [
+    ingest_proceeding_version(
+      tenant_id=tenant_id,
+      environment=environment,
+      proceeding_id=entry['proceeding_id'],
+      version_id=entry['version_id'],
+      status=entry['status'],
+      docket_number=entry['docket_number'],
+      issued_at=datetime.fromisoformat(entry['issued_at'].replace('Z', '+00:00')),
+      source_url=entry['source_url'],
+      text_path=proceedings_dir / entry['text_file'],
+    )
+    for entry in manifest['proceedings']
+  ]
   obligations, projects, documents = ingest_company_context(tenant_id, environment)
-  return [nopr, final], obligations, projects, documents
+  return versions, obligations, projects, documents

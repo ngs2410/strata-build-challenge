@@ -1,0 +1,22 @@
+{
+  "proceedings": [
+    {
+      "proceeding_id": "ferc-order-2222",
+      "version_id": "nopr-2019-11",
+      "status": "draft",
+      "docket_number": "RM18-9",
+      "issued_at": "2019-11-21T00:00:00Z",
+      "source_url": "https://www.ferc.gov/sites/default/files/2020-06/E-1_0.pdf",
+      "text_file": "order-2222-nopr.txt"
+    },
+    {
+      "proceeding_id": "ferc-order-2222",
+      "version_id": "final-2020-09",
+      "status": "final",
+      "docket_number": "RM18-9",
+      "issued_at": "2020-09-17T00:00:00Z",
+      "source_url": "https://www.ferc.gov/sites/default/files/2020-09/E-1_0.pdf",
+      "text_file": "order-2222-final.txt"
+    }
+  ]
+}

@@ -702,12 +702,11 @@ is replay-to-timestamp.
   scale), the `ReviewItem` is created with `status='escalated'`
   immediately — bypasses the auto-approval path per CLAUDE.md invariant.
 - `src/audit_log.py` owns the append-only JSONL log at
-  `data/tenants/<tenant>/<environment>/audit_log.jsonl`. The log is
-  loaded and folded in memory to produce current state.
+  `data/tenants/<tenant>/<environment>/audit_log.jsonl`. Every state
+  transition appends an `AuditEvent`.
 - Rachel's actions in the web view (`approve` / `override` / `escalate`)
-  emit new `AuditEvent`s.
-- Rollback: `audit_log.replay_until(timestamp)` reconstructs current
-  state from events up to a cutoff. v1 does this on-demand per request.
+  emit new `AuditEvent`s **and** update the `ReviewItem.status` column
+  pragmatically — see Decisions below.
 
 **Production.**
 - Postgres `audit_events` table (append-only, indexed by
@@ -715,22 +714,29 @@ is replay-to-timestamp.
 - Materialised views for folded state: `current_review_items`,
   `current_project_states` — refreshed on write via triggers or an
   event-sourcing projection worker.
-- Rollback becomes a transactional operation: snapshot the
-  fold-up-to-timestamp into a staging state; swap pointers.
+- Rollback becomes a transactional operation (see §8.8 open question
+  for the v1 → prod path).
 
 **Decisions.**
-- **Fold-over-append-only-log vs. mutable state columns.** CLAUDE.md
-  invariant. Mutable columns lose history — once you overwrite
-  `status='pending'` to `status='approved'`, you cannot answer "when
-  exactly did Rachel approve this?" without a separate audit trail. The
-  log *is* the state; current status is a projection.
-- **Rollback as replay (not inverse operations).** Alternatives: store
-  inverse ops per event (expensive to compute, error-prone); use CRDTs
-  (overkill); adopt an event-sourcing framework (overkill for v1).
-  Replay is deterministic, provably correct, and dead simple.
+- **Mutable `ReviewItem.status` column *and* append-only audit log,
+  for v1.** The challenge requires "a living, auditable project state"
+  — satisfied by the audit log capturing every transition. The pure
+  fold-over-log architecture (current status derived at read time
+  from the log) is cleaner but adds machinery (fold helpers,
+  cache-vs-source-of-truth design) that is not required by the brief.
+  v1 ships the pragmatic shape: the audit log is the source of truth
+  for *history*; the mutable `status` column is the source of truth
+  for *right now*. The pair is reconciled on write (every status
+  mutation emits a matching `AuditEvent`). The pure fold architecture
+  is tracked as open question §8.8.
+- **Rollback deferred to future work.** CHALLENGE.md requires an
+  auditable state, not rollback. Rollback (`replay_until(timestamp)`)
+  is one of six optional depth areas we did not choose — our depth
+  areas are citation grounding (§3.3 + §3.4) and evals (§5). Rollback
+  design is retained in §8.8 for future work.
 - **JSONL on disk in v1.** For ~hundreds of events per end-to-end run,
-  loading and folding in memory is instantaneous. At tens of thousands
-  of events per tenant, the fold stays cheap in Python; at millions,
+  loading in memory is instantaneous. At tens of thousands of events
+  per tenant, read-time scanning stays cheap in Python; at millions,
   Postgres with materialised views is correct.
 
 ---
@@ -1180,17 +1186,15 @@ concrete:
 
 ### 6.1 CLI
 
-**Role.** The operator-facing surface. Four scripts, each with absl
-flags.
+**Role.** The operator-facing surface. absl-flagged scripts.
 
-- `scripts/main_ingest.py --tenant_id --environment` — ingest proceeding
-  versions + company context.
-- `scripts/main_detect_changes.py --tenant_id --environment
-  --proceeding_id` — run the §3.2–3.6 pipeline for a specific
-  proceeding.
+- `scripts/main_detect_changes.py --tenant_id --environment` — ingests
+  and runs the §3.1–3.6 pipeline end-to-end in one command. v1 keeps
+  ingest + pipeline combined (see Decisions below).
 - `scripts/main_review.py --tenant_id --environment --port=8000` —
-  launch the FastAPI web view (uvicorn wrapper).
-- `scripts/main_eval.py --tenant_id --gold_file` — run evals end-to-end.
+  launches the FastAPI web view (uvicorn wrapper).
+- `scripts/main_eval.py --tenant_id --gold_file` — runs evals
+  end-to-end.
 
 Every script supports `--dry_run`, `--k`, `--profile`, `--confirm_llm`
 (per CLAUDE.md).
@@ -1204,9 +1208,13 @@ Every script supports `--dry_run`, `--k`, `--profile`, `--confirm_llm`
 **Decisions.**
 - **absl flags over argparse.** Centralised flag registration;
   cross-script flag reuse; standard flag types.
-- **One concern per script.** `main_ingest` does only ingest;
-  `main_detect_changes` does only detection. Composition via scheduler,
-  not via megascripts.
+- **Combined ingest + pipeline in v1; split in a future commit.** The
+  original plan was a separate `scripts/main_ingest.py` that persists
+  ingested proceedings + company context, with `main_detect_changes.py`
+  reading from the persisted state. For v1, keeping ingest inline in
+  `main_detect_changes.py` is a smaller surface and reviewers run one
+  command. The split happens when scheduled / incremental ingest is
+  added (production path).
 
 ### 6.2 Web View
 
@@ -1219,12 +1227,14 @@ Every script supports `--dry_run`, `--k`, `--profile`, `--confirm_llm`
     description, source citation (link to the Passage text with the
     citing span highlighted), affected items, recommended action,
     confidence, and `[approve] [override] [escalate]` buttons.
-  - `GET /audit?tenant_id=&environment=&project_id=` →
-    `templates/audit.html` — chronological `AuditEvent` list for a
-    project with a "rollback to this point" button on each event.
+  - `GET /audit?tenant_id=&environment=` → `templates/audit.html` —
+    read-only chronological `AuditEvent` list for the tenant /
+    environment. v1 is log-viewer only; the "rollback to this point"
+    affordance is deferred to future work along with the rollback
+    implementation itself (see §8.8).
   - `POST /queue/<review_item_id>/action` — handle
-    approve/override/escalate; emits `AuditEvent`, redirects back to
-    queue.
+    approve/override/escalate; emits `AuditEvent`, updates
+    `ReviewItem.status`, redirects back to queue.
 - Jinja2 templates; no JS beyond a single form submit. All state
   server-rendered.
 - Auth: `tenant_id` in query parameter (no multi-user story in v1).
@@ -1413,6 +1423,36 @@ auto-generating a new review item.
 
 **Trigger.** Rachel's feedback shows routine re-review of unchanged
 items is a significant time cost.
+
+### 8.8 Pure fold-over-log state + rollback
+
+**State.** v1 ships a pragmatic hybrid: the audit log is the source of
+truth for *history*; `ReviewItem.status` (a mutable column on the
+persisted ReviewItem) is the source of truth for *right now*. Every
+status mutation emits a matching `AuditEvent` on the same transaction,
+so the pair is reconciled on write. The `/audit` web view is a
+read-only log viewer in v1.
+
+**Open.** Two intertwined architectural moves live here:
+- **Pure fold:** make the audit log the sole source of truth; derive
+  `ReviewItem.status` at read time by scanning events for that
+  review_item_id. Removes the "both must agree" invariant at write
+  time; adds a fold helper + caching discussion.
+- **Rollback-as-replay:** `audit_log.replay_until(timestamp)`
+  reconstructs state as of a cutoff, enabling a "rollback to this
+  point" affordance on the audit page. One of CHALLENGE.md's six
+  optional depth areas (not the two we chose).
+
+**Next move.** `src/state_fold.py` with
+`fold_review_item_status(review_item_id)` + `replay_until(timestamp)`;
+`/audit` page gains a rollback button that fires a transactional
+staging-state swap. Trades the mutable column for a materialised view
+in production.
+
+**Trigger.** Either (a) a reviewer specifically asks for undo of a
+mis-approval, (b) the audit log and status column drift in practice,
+or (c) we choose audit-and-rollback as a depth area in a future
+revision.
 
 ---
 

@@ -37,8 +37,10 @@ class PromptSpec:
 
 ```
 ## Task → ## Steps → ## Details → ## Rubrics → ## Pitfalls
-→ ## Field Intents → ## Inputs → ## JSON Output Example
+→ ## Field Intents → ## JSON Output Example → ## Inputs
 ```
+
+**`## Inputs` is deliberately last** to maximise OpenAI's prompt-prefix caching. Everything from `## Task` through `## JSON Output Example` must be byte-identical across every call of the same task — identical system_prompt, identical task description, identical rubrics, identical JSON example. Only the Inputs block varies per call. On the second+ call within the cache window, the stable prefix (typically ~90% of the input tokens for a Strata task) is cached and billed at the lower cached-input rate. Any content that varies per call MUST live inside `inputs_dict`; anything that would make the prefix drift between calls (per-run timestamps, per-tenant branding, randomised preamble, etc.) is a cost regression.
 
 ### ⚠ The `included_inputs=[]` trap
 

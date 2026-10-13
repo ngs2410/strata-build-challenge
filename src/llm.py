@@ -12,6 +12,15 @@ run-specific inputs. `render(included_inputs)` returns a
 (`## Task`, `## Steps`, …) so prompt structure is consistent across every
 task.
 
+Section order in the rendered user message is deliberate:
+`## Task → ## Steps → ## Details → ## Rubrics → ## Pitfalls →
+## Field Intents → ## JSON Output Example → ## Inputs`. The run-specific
+`## Inputs` block sits at the END so the stable prefix (Task through
+JSON Output Example) is byte-identical across every call of the same
+task — this is what OpenAI's prompt-prefix caching hashes on. Keeping
+Inputs last turns ~90% of each call's input tokens into cached-prefix
+tokens on second+ runs within the cache window, cutting per-call cost.
+
 `included_inputs` filters `inputs_dict` by key — set per
 `TaskModelConfig.included_inputs` so each task controls which inputs it
 actually injects. Keys not in `INPUT_LABELS` raise `KeyError` at render time
@@ -58,6 +67,10 @@ class PromptSpec:
   inputs_dict: dict = field(default_factory=dict)
 
   def render(self, included_inputs: tuple[str, ...] = ()) -> tuple[str, str]:
+    # Section order is deliberate for OpenAI's prompt-prefix caching:
+    # everything from Task through JSON Output Example must be byte-identical
+    # across every call of the same task so the stable prefix caches. Only
+    # Inputs varies per call and sits at the end.
     sections: list[str] = [f'## Task\n{self.task}']
     for heading, body in (
       ('Steps', self.steps),
@@ -68,9 +81,9 @@ class PromptSpec:
     ):
       if body is not None:
         sections.append(f'## {heading}\n{body}')
-    sections.append(self._render_inputs(included_inputs))
     if self.json_example is not None:
       sections.append(f'## JSON Output Example\n{self.json_example}')
+    sections.append(self._render_inputs(included_inputs))
     user_message = '\n\n'.join(s for s in sections if s)
     return self.system_prompt, user_message
 

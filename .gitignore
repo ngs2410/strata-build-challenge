@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env3.12/
+env3.12
+env3.12-ft
+training_data
+
+# IDE
+.vscode/
+.idea/
+.ruff_cache/
+.claude/*
+!.claude/commands/
+!.claude/skills/
+
+# Test/coverage artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.json
+mutants/
+
+# Environment files
+.env
+.env.*
+
+# Inference
+.llm_cache
+.embedding_cache
+.model_cache/

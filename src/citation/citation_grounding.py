@@ -49,6 +49,18 @@ from src.config import (
 from src.obligation_extraction import LlmExtractedObligation
 from src.version_diff import LlmChange
 
+GROUNDING_PENDING_RATIONALE: str = 'pending citation_verify stage'
+GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE: str = 'citing span not found in cited passage'
+GROUNDING_FAILED_MIN_SPAN_FMT: str = (
+  'span width {width} below citation.min_citation_span_chars={min_span}'
+)
+
+
+def is_grounding_pending(citation: Citation | None) -> bool:
+  if citation is None:
+    return False
+  return citation.verification_rationale == GROUNDING_PENDING_RATIONALE
+
 
 def ground_citations_for_changes(
   llm_changes: list[LlmChange],
@@ -125,8 +137,8 @@ def _resolve(
       start_offset=0,
       end_offset=0,
       verified=False,
-      verification_rationale=(
-        f'span width {len(citing_span)} below citation.min_citation_span_chars={min_span}'
+      verification_rationale=GROUNDING_FAILED_MIN_SPAN_FMT.format(
+        width=len(citing_span), min_span=min_span
       ),
     )
   start = passage.text.find(citing_span)
@@ -136,12 +148,12 @@ def _resolve(
       start_offset=0,
       end_offset=0,
       verified=False,
-      verification_rationale='citing span not found in cited passage',
+      verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
     )
   return Citation(
     passage_id=passage.passage_id,
     start_offset=start,
     end_offset=start + len(citing_span),
     verified=False,
-    verification_rationale='pending citation_verify stage',
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
   )

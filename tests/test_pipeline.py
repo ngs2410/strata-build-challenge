@@ -2,7 +2,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.citation.citation_grounding import ground_citations_for_changes, ground_obligations
+from src.citation.citation_grounding import (
+  GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  GROUNDING_PENDING_RATIONALE,
+  ground_citations_for_changes,
+  ground_obligations,
+)
 from src.citation.citation_verify import verify_citations
 from src.citation.llm_citation import LlmCitation
 from src.config import (
@@ -192,7 +197,7 @@ def test_ground_citations_finds_substring_and_computes_offsets():
   assert grounded[0].prior_citation.start_offset == 0
   assert grounded[0].prior_citation.end_offset == len(known_span)
   assert grounded[0].prior_citation.verified is False  # pending verify stage
-  assert grounded[0].prior_citation.verification_rationale == 'pending citation_verify stage'
+  assert grounded[0].prior_citation.verification_rationale == GROUNDING_PENDING_RATIONALE
 
 
 def test_ground_citations_marks_unverified_when_citing_span_not_found():
@@ -239,10 +244,93 @@ def test_verify_citations_sets_verified_true_for_known_passage():
     start_offset=0,
     end_offset=10,
     verified=False,
-    verification_rationale='pending',
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
   )
   verified = verify_citations([_change('tightened', prior_citation=citation)], nopr, final)
   assert verified[0].prior_citation.verified is True
+
+
+def test_verify_citations_preserves_grounding_failure_without_calling_llm():
+  # When grounding has already stamped a citation unverified (span not
+  # found), the LLM verifier must NOT be allowed to vote "true" on the
+  # structurally-broken citation. The grounding verdict is preserved
+  # verbatim.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  failed = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=0,
+    verified=False,
+    verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  )
+  verified = verify_citations([_change('tightened', prior_citation=failed)], nopr, final)
+  assert verified[0].prior_citation.verified is False
+  assert verified[0].prior_citation.verification_rationale == (
+    GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
+  )
+
+
+def test_verify_citations_short_circuits_when_no_change_has_pending_citation():
+  # Every citation already failed grounding — the LLM must not be
+  # called. We assert this by passing a change list that would otherwise
+  # trigger the stub verifier (which marks pending citations verified)
+  # and confirming the failed sentinel survives.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  prior_failed = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=0,
+    verified=False,
+    verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  )
+  new_failed = Citation(
+    passage_id='proc:final:§1:p1',
+    start_offset=0,
+    end_offset=0,
+    verified=False,
+    verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  )
+  change = _change('tightened', prior_citation=prior_failed, new_citation=new_failed)
+  verified = verify_citations([change], nopr, final)
+  assert verified[0].prior_citation.verified is False
+  assert verified[0].new_citation.verified is False
+  assert verified[0].prior_citation.verification_rationale == (
+    GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
+  )
+  assert verified[0].new_citation.verification_rationale == (
+    GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
+  )
+
+
+def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side():
+  # A change with one pending citation and one grounding-failed citation.
+  # The LLM is called, but its vote only applies to the pending side —
+  # the failed side keeps its grounding rationale verbatim.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  pending = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=10,
+    verified=False,
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
+  )
+  failed = Citation(
+    passage_id='proc:final:§1:p1',
+    start_offset=0,
+    end_offset=0,
+    verified=False,
+    verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  )
+  change = _change('tightened', prior_citation=pending, new_citation=failed)
+  verified = verify_citations([change], nopr, final)
+  assert verified[0].prior_citation.verified is True  # LLM voted on pending
+  assert verified[0].new_citation.verified is False  # grounding failure preserved
+  assert verified[0].new_citation.verification_rationale == (
+    GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
+  )
 
 
 def test_extract_obligations_produces_one_entry_per_version():

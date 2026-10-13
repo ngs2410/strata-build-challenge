@@ -26,6 +26,19 @@ Response merging:
     `verified=False` with a diagnostic rationale — this is a verifier bug
     we want visible, not a silent pass.
 
+Short-circuit on failed grounding:
+  * A citation whose grounding step produced a failure sentinel (span
+    not found, span below min width) carries a
+    `verification_rationale` other than `GROUNDING_PENDING_RATIONALE`.
+    `_apply_verification` returns such a citation unchanged — the LLM
+    vote is NEVER allowed to overwrite the grounding failure. If NO
+    change in the batch has any pending citation, `verify_citations`
+    skips the LLM call entirely and returns `changes` as-is. Rationale:
+    (a) a citation that can't be anchored structurally should not be
+    reported as semantically verified, and (b) at gpt-5.4-nano the
+    verifier would otherwise vote "true" on an empty span and silently
+    launder a grounding failure into a verified citation.
+
 The LLM is instructed to quote the specific supporting phrase in its
 rationale, so a reviewer scanning an "unverified" item can see WHY — not
 just that the verifier declined.
@@ -37,6 +50,7 @@ path without an API call.
 
 from pydantic import BaseModel, ConfigDict
 
+from src.citation.citation_grounding import is_grounding_pending
 from src.config import Change, Citation, ProceedingVersion
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
@@ -172,6 +186,12 @@ def verify_citations(
   prior: ProceedingVersion,
   final: ProceedingVersion,
 ) -> list[Change]:
+  needs_llm = any(
+    is_grounding_pending(change.prior_citation) or is_grounding_pending(change.new_citation)
+    for change in changes
+  )
+  if not needs_llm:
+    return changes
   prompt = build_citation_verify_prompt(changes, prior, final)
   system, user = prompt.render()
   response = model_caller.call(
@@ -250,6 +270,8 @@ def _apply_verification(
 ) -> Citation | None:
   if citation is None:
     return None
+  if not is_grounding_pending(citation):
+    return citation
   if verified is None:
     return citation.model_copy(
       update={

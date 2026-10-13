@@ -224,6 +224,107 @@ def test_pipeline_dry_run_persists_nothing_under_env_dir(verdant_grid_seeded):
     assert list(env_dir.iterdir()) == []
 
 
+def test_apply_action_approve_transitions_status_and_logs_event(verdant_grid_seeded):
+  from src.audit_log import audit_log_store
+  from src.review_queue import apply_action
+  from src.stores import review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  items_before = review_item_store.load_all('verdant_grid', 'prod')
+  pending = next(i for i in items_before if i.status == 'pending')
+  updated = apply_action(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    action='approve',
+    actor='rachel',
+    rationale='looks good',
+  )
+  assert updated.status == 'approved'
+  items_after = review_item_store.load_all('verdant_grid', 'prod')
+  stored = next(i for i in items_after if i.review_item_id == pending.review_item_id)
+  assert stored.status == 'approved'
+  events = audit_log_store.load_all('verdant_grid', 'prod')
+  approval_events = [e for e in events if e.kind == 'review_item_approved']
+  assert len(approval_events) == 1
+  assert approval_events[0].target_id == pending.review_item_id
+  assert approval_events[0].actor == 'rachel'
+  assert approval_events[0].rationale == 'looks good'
+
+
+def test_apply_action_override_sets_overridden_status(verdant_grid_seeded):
+  from src.review_queue import apply_action
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  from src.stores import review_item_store
+
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  updated = apply_action(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    action='override',
+    actor='rachel',
+    rationale='wrong mapping',
+  )
+  assert updated.status == 'overridden'
+
+
+def test_apply_action_escalate_sets_escalated_status(verdant_grid_seeded):
+  from src.review_queue import apply_action
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  from src.stores import review_item_store
+
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  updated = apply_action(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    action='escalate',
+    actor='rachel',
+    rationale='needs GC review',
+  )
+  assert updated.status == 'escalated'
+
+
+def test_apply_action_raises_on_unknown_action(verdant_grid_seeded):
+  from src.review_queue import apply_action
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  from src.stores import review_item_store
+
+  item = review_item_store.load_all('verdant_grid', 'prod')[0]
+  with pytest.raises(ValueError, match='unknown review action'):
+    apply_action(
+      tenant_id='verdant_grid',
+      environment='prod',
+      review_item_id=item.review_item_id,
+      action='bogus',  # type: ignore[arg-type]
+      actor='x',
+      rationale='x',
+    )
+
+
+def test_apply_action_raises_on_unknown_review_item_id(verdant_grid_seeded):
+  from src.review_queue import apply_action
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  with pytest.raises(ValueError, match='review_item_id not found'):
+    apply_action(
+      tenant_id='verdant_grid',
+      environment='prod',
+      review_item_id='does-not-exist',
+      action='approve',
+      actor='x',
+      rationale='x',
+    )
+
+
 def test_pipeline_isolates_tenants(verdant_grid_seeded):
   import shutil
 

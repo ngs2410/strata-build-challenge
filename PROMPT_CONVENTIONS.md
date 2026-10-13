@@ -66,21 +66,32 @@ End with `"You produce structured JSON output."` — this is a near-universal cl
 ### `steps`
 Numbered procedure, usually 4–8 top-level steps with optional sub-steps (`1a`, `5b`). Each step describes a discrete action. Steps are *procedural*; save calibration for `details`.
 
-### `details` — **this is where inputs DO NOT go**
+### `details` — **this is where inputs DO NOT go, and rubrics DO NOT go**
 
-`details` is for **calibration** — the content the LLM needs to make the judgment correctly but can't derive from the task statement alone:
+`details` is for **task elaboration** — procedural guidance for how to perform the task that doesn't belong in `steps` (not ordered enough) but also isn't a scoring rubric. Think disambiguation precedence rules, worked examples, decision procedures for confusable categories. If the content is a *rubric* — a labelled list of values the model picks from (change types, confidence levels, obligation types, routing destinations) — it belongs in `rubrics`, NOT in `details`.
 
-- Taxonomies with cross-domain examples (`src/extraction/obligation_extraction.py`'s `OBLIGATION_TAXONOMY_REFERENCE`)
-- Decision rules for confusable categories ("REPORTING vs PROCEDURAL: does the obligation require a submission from the company, or does it govern the process by which an existing obligation must be executed?")
+Legitimate `details` content:
+
 - Disambiguation precedence rules (`src/ingest/proceeding_ingest.py`'s "docket metadata > order caption > filing cover sheet")
-- **Worked examples** — the single most effective calibration technique. `src/extraction/obligation_extraction.py` (two full examples per obligation type with good/bad extractions and near-miss negatives) is the gold standard. For smaller prompts, a 3–4 line `Example N — <verdict>:` block per major judgment axis is appropriate (see `src/mapping/change_to_obligation.py`).
+- Decision procedures for confusable judgment calls ("REPORTING vs PROCEDURAL: does the obligation require a submission from the company, or does it govern the process by which an existing obligation must be executed?") — note this is a *procedure*, not a rubric; rubrics are the labelled value definitions themselves
+- **Worked examples** — the single most effective calibration technique. For smaller prompts, a 3–4 line `Example N — <verdict>:` block per major judgment axis is appropriate.
 
-Never put input data (the text to be classified, the thread prose, candidate lists, etc.) into `details`. That belongs in `inputs_dict`.
+Explicitly NOT details content:
+
+- **Rubrics** (`CHANGE_TYPE_RUBRIC`, `CONFIDENCE_LEVEL_RUBRIC`, `OBLIGATION_TAXONOMY_REFERENCE`) — these go in `rubrics`. The whole point of the Rubrics section is that it's where all per-value / per-level definitions live, so the model has one canonical place to look.
+- **Input data** (the text to be classified, candidate lists, etc.) — that belongs in `inputs_dict`.
+
+Many prompts have no `details` content at all — if the task has no procedure beyond the rubric content, leave `details=None` (the default). The three live tasks `version_diff`, `obligation_extraction`, and `mapping` all currently ship without a `details=` arg because every scoring artifact is a rubric and goes in `rubrics`.
 
 ### `rubrics`
-Quality acceptance criteria as a bulleted checklist. Phrased as positive statements: "Each concept must be a self-contained structural unit." Describes what "good" output looks like.
+Everything the model picks a value from, plus quality acceptance criteria. Two kinds of content both belong here:
 
-**Scale with task complexity, not task importance.** A richly nuanced judgment (segmentation, role classification, feature extraction, decision record origination) often needs 8–15 rubrics to cover the quality dimensions. A simple binary or categorical pick (record matching, narrative form classification) may need only 2–4 — trying to pad it to 10 produces vacuous or repetitive items that dilute the signal. Write only what adds real calibration; a tight 3-rubric list on a simple task is better than 12 diluted ones.
+1. **Per-value / per-level definitions** — the `CHANGE_TYPE_RUBRIC` (five values with descriptions), `CONFIDENCE_LEVEL_RUBRIC` (six levels 0-5 with descriptions), `OBLIGATION_TAXONOMY_REFERENCE` (four obligation types with descriptions + examples). Build them programmatically from a data source (see §10) so the Literal types and prompt text never drift. Compose them into `rubrics` with blank-line separators.
+2. **Additional rules** — a bulleted checklist of quality acceptance criteria. Phrased as positive statements: "Each concept must be a self-contained structural unit." Describes what "good" output looks like.
+
+Convention when both are present: rubric content first, then a blank line + `Additional rules:` + the bulleted checklist. Bullets that reference a rubric say "per the X rubric above" (same section) — never "per the X rubric in Details" (that would be a §3-level mistake).
+
+**Scale with task complexity, not task importance.** A richly nuanced judgment (segmentation, role classification, feature extraction, decision record origination) often needs 8–15 rubric bullets to cover the quality dimensions. A simple binary or categorical pick (record matching, narrative form classification) may need only 2–4 — trying to pad it to 10 produces vacuous or repetitive items that dilute the signal. Write only what adds real calibration; a tight 3-rubric list on a simple task is better than 12 diluted ones.
 
 ### `pitfalls`
 Explicit anti-patterns. Phrased negatively: "Do not split multi-clause dynamics into separate segments." Describes observed failure modes.

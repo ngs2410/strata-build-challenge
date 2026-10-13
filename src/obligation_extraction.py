@@ -115,19 +115,23 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       'cite each to its source passage. You produce structured JSON output.'
     ),
     task='Extract every discrete obligation from the passage below.',
-    details=OBLIGATION_TAXONOMY_REFERENCE + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
+      OBLIGATION_TAXONOMY_REFERENCE
+      + '\n\n'
+      + CONFIDENCE_LEVEL_RUBRIC
+      + '\n\n'
+      'Additional rules:\n'
       '- One LlmExtractedObligation per discrete obligation.\n'
       '- obligation_type is one of reporting / operational / procedural / '
-      'financial per the taxonomy in Details.\n'
+      'financial per the taxonomy above.\n'
       '- Each obligation carries a structural citation: passage_id + '
       'citing_span. citing_span is the VERBATIM text copied '
       'character-for-character from the cited passage. Do NOT paraphrase, '
       'summarise, or truncate mid-word. Do NOT count characters or emit '
       'numeric offsets — grounding is done deterministically by Python '
       'after this call.\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric in '
-      'Details; set confidence_rationale naming the rubric level and why.'
+      '- Report confidence as an integer 0-5 per the confidence rubric '
+      'above; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'passage_text': ('--- start of passage ---\n' + passage_text + '\n--- end of passage ---'),

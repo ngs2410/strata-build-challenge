@@ -151,7 +151,6 @@ def build_mapping_prompt(
       'Map the Change below to its affected items. Recommend an action and '
       'route to the right internal team.'
     ),
-    details=CONFIDENCE_LEVEL_RUBRIC,
     field_intents=(
       '- affected_items[*].item_type: one of obligation / project / document.\n'
       '- affected_items[*].item_index: 0-based index into the matching '
@@ -162,9 +161,12 @@ def build_mapping_prompt(
       '- recommended_action: one of review / amend / no_op.\n'
       '- routing_destination: one of market_ops / legal / it_metering — '
       'the single PRIMARY team accountable (TDD §8.6 scope limit).\n'
-      '- confidence: integer 0-5 per the rubric in Details.'
+      '- confidence: integer 0-5 per the rubric in Rubrics.'
     ),
     rubrics=(
+      CONFIDENCE_LEVEL_RUBRIC
+      + '\n\n'
+      'Additional rules:\n'
       '- Emit affected_items by 0-based index into the matching candidate '
       'list, NOT by copying the item id string. Index-based selection '
       'prevents id hallucination.\n'
@@ -172,8 +174,8 @@ def build_mapping_prompt(
       '- routing_destination is one of market_ops / legal / it_metering. '
       'Pick the single PRIMARY team accountable for the change. Secondary '
       'teams are not modelled in v1 (TDD §8.6).\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric in '
-      'Details; set confidence_rationale naming the rubric level and why.'
+      '- Report confidence as an integer 0-5 per the confidence rubric '
+      'above; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'change_description': change_summary,

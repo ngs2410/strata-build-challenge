@@ -175,10 +175,14 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       'passage in each version. You produce structured JSON output.'
     ),
     task=('Compare the prior and new versions below and return a list of material changes.'),
-    details=CHANGE_TYPE_RUBRIC + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
+      CHANGE_TYPE_RUBRIC
+      + '\n\n'
+      + CONFIDENCE_LEVEL_RUBRIC
+      + '\n\n'
+      'Additional rules:\n'
       '- Classify each change as added / removed / tightened / loosened / '
-      'cosmetic per the change-type rubric in Details.\n'
+      'cosmetic per the change-type rubric above.\n'
       '- Attach prior_citation and new_citation; set one to null when the '
       'change is added-only or removed-only.\n'
       '- Pure rewording that preserves meaning is cosmetic, not material.\n'
@@ -186,8 +190,8 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       "from the cited passage. Do NOT paraphrase, summarise, or truncate "
       'mid-word. Do NOT count characters or emit numeric offsets — grounding '
       'is done deterministically by Python after this call.\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric in '
-      'Details; set confidence_rationale naming the rubric level and why.'
+      '- Report confidence as an integer 0-5 per the confidence rubric '
+      'above; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'prior_version_text': (

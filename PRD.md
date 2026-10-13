@@ -131,12 +131,13 @@ Three structural ingredients are consistent across all four: (1) the regulator p
 Explicitly out of scope for the build-challenge submission. Each is a defensible deferral, not an oversight.
 
 - **Full-document ingest.** The one subsection only. Scaling to full 660-page rules is a depth-area problem for document-diffing-at-scale, not a wedge requirement.
-- **Multi-tenant demo at scale.** One synthetic tenant (Verdant Grid). The `(tenant_id, environment)` plumbing is in place from day one, so adding a second tenant is a config change, not a refactor.
+- **Multi-tenant demo at scale.** One synthetic tenant (Verdant Grid). The `(tenant_id, environment)` plumbing is in place from day one, so adding a second tenant is a config change, not a refactor. The production shape also assumes shared-database logical isolation (row-level security + per-environment schemas); some regulated enterprises will require stronger **per-tenant physical isolation** — a distinct database or cluster rather than RLS — and the `Store[T]` facade reserves that seam, but delivering it per tenant is a post-wedge production option, not a v1 deliverable.
 - **Multi-jurisdiction.** FERC only. State utility commissions and other federal regulators come later.
 - **Push-based or scheduled ingestion.** The user triggers an ingest from the command line. Scheduled or event-driven ingestion is post-wedge.
 - **Integrations with Jira and Slack.** Strata produces the mapping memo and routes items to in-system reviewer queues. External integrations are post-wedge.
-- **Fine-tuning our own models.** We use a commercial frontier model (OpenAI) with structured outputs. No model training in v1.
+- **Tenant-chosen models, providers, and API keys.** v1 uses a single commercial frontier model (OpenAI) with structured outputs, under our account and our API key, with no fine-tuning. A credible production path lets a tenant **supply their own API key**, **select an alternative provider** (Anthropic, Google, a self-hosted vLLM, or an on-prem endpoint), or **point at a tenant-owned fine-tuned model** — scenarios driven by existing procurement contracts, data-sharing constraints that limit which provider sees regulated content, or in-house model investments. The `ModelCaller` dispatch seam (TDD §4.1) reserves the hook; wiring per-tenant provider/key/model selection is a post-wedge production option.
 - **Rich workspace UI.** The v1 web view is deliberately minimal: a review-queue page and an audit-log page (see §3). Dashboards, team-wide analytics, bulk operations, inline mapping edits, saved filters, and SSO authentication are all post-wedge.
+- **Tenant-chosen deployment target.** v1 ships as a developer-run Python app on one host. A containerized (OCI-image) deployment that an enterprise tenant can run on **their chosen cloud provider** (AWS / GCP / Azure) or **on-premise / air-gapped** is a standard expectation for regulated buyers — driven by data-residency rules, procurement-approved provider lists, or security teams that insist the workload live inside their own perimeter. Supporting this is a post-wedge production option, not a v1 requirement.
 
 ---
 

@@ -777,6 +777,22 @@ cost telemetry, backend selection.
 - Replace Jev stub with real client (`typesafe-sdk`'s
   `POST /v1/systemone`).
 
+**Future (tenant-driven, post-wedge).** The existing `backend_type`
+discrimination on `TaskModelConfig` reserves the seam; wiring BYO is
+additive, not a redesign. Preserves the CLAUDE.md "no irreversible
+vendor dependencies" principle.
+- **Tenant-supplied API keys** via `DomainConfig`, resolved through the
+  existing `secret://env/...` indirection or a prod-time secret manager.
+  Per-tenant cost accounting already implies per-tenant key accounting;
+  BYO keys shifts the cost line to the tenant.
+- **Alternative providers** (Anthropic, Google, self-hosted vLLM,
+  on-prem endpoints) via new `backend_type` values on `TaskModelConfig`
+  plus matching `ModelCaller` adapters alongside the current `openai` /
+  `jev` adapters. Call sites stay backend-agnostic.
+- **Tenant-owned fine-tuned models** via a tenant-scoped `model_id`
+  reference resolved by the selected backend adapter — no changes to
+  task-level call sites.
+
 **Decisions.**
 - **One chokepoint for all AI dispatch (OpenAI + Jev).** Caching,
   retries, cost telemetry, and structured-output discipline all live in
@@ -946,6 +962,23 @@ within a tenant.
   `staging_schema`) with the same table shapes.
 - Request-level auth binds `tenant_id` + `environment` from the auth
   token; HTTP routes cannot request a tenant they don't belong to.
+
+**Future (tenant-driven, post-wedge).** RLS + per-environment schemas
+in a shared Postgres is the default production shape. Some regulated
+enterprises will require stronger **physical isolation** — data-residency
+rules, procurement-approved infrastructure lists, or security teams that
+reject shared-database designs on principle. The `Store[T]` facade +
+`(tenant_id, environment)` plumbing reserves the seam:
+- A tenant marked `isolation: 'physical'` resolves to a **tenant-specific
+  Postgres instance** (or cluster) via a per-tenant `Store[T]` concrete
+  selection — the facade signature is unchanged; call sites stay
+  backend-agnostic.
+- Co-exists with the shared-RLS default: tenants without the flag
+  continue to share the main Postgres. Physical isolation is per-tenant
+  opt-in, not a global mode flip.
+- The `Backend.matches(identifier) -> bool` dispatch pattern
+  (CLAUDE.md) accommodates the per-tenant backing URL without touching
+  callers.
 
 **Decisions.**
 - **Explicit `(tenant_id, environment)` parameters** vs. implicit from
@@ -1233,6 +1266,9 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
 | Telemetry             | structlog JSON stderr       | OTel Collector + Grafana                            | Cross-service tracing                |
 | Security              | dotenv + tenant_id in URL   | OIDC + secret manager + RLS                         | First real user besides reviewer     |
 | Web UI                | FastAPI + Jinja2            | SPA + WebSocket + OIDC                              | Real-time updates / multi-reviewer   |
+| Deployment            | Dev-run Python on one host  | Containerized (OCI) → tenant cloud or on-prem       | First tenant demanding own cloud / on-prem |
+| Model backend         | OpenAI frontier + diskcache | Per-tenant backend + BYO key + tenant fine-tuned    | First tenant with provider restrictions or BYO-key |
+| Tenant data isolation | Filesystem per tenant       | Shared Postgres + RLS default; per-tenant DB opt-in | First tenant requiring physical isolation |
 
 ### Capacity envelope
 

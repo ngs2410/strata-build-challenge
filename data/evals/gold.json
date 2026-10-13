@@ -61,6 +61,12 @@
           "description_keywords": ["register"]
         },
         {
+          "version_id": "nopr-2019-11",
+          "obligation_type": "operational",
+          "passage_position": 3,
+          "description_keywords": ["capability", "services"]
+        },
+        {
           "version_id": "final-2020-09",
           "obligation_type": "procedural",
           "passage_position": 1,
@@ -77,30 +83,57 @@
           "obligation_type": "operational",
           "passage_position": 3,
           "description_keywords": ["telemetry"]
+        },
+        {
+          "version_id": "final-2020-09",
+          "obligation_type": "operational",
+          "passage_position": 3,
+          "description_keywords": ["capability", "services"]
         }
       ],
       "expected_mappings": [
         {
           "change_match": ["loosened", 1, 1],
           "affected_obligation_ids": ["VG-OBL-DER-SIZE-01"],
-          "affected_project_ids": [],
-          "affected_document_ids": ["VG-DOC-TARIFF-FILING-2026Q4"],
+          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1"],
+          "affected_document_ids": [
+            "VG-DOC-TARIFF-FILING-2026Q4",
+            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
+          ],
           "recommended_action": "review",
           "routing_destination": "legal"
         },
         {
           "change_match": ["tightened", 2, 2],
-          "affected_obligation_ids": ["VG-OBL-DER-REG-01"],
-          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1"],
-          "affected_document_ids": ["VG-DOC-DER-OPS-PROC-v3.2"],
+          "affected_obligation_ids": [
+            "VG-OBL-DER-REG-01",
+            "VG-OBL-DER-DISPATCH-NOTIF-01"
+          ],
+          "affected_project_ids": [
+            "VG-PRJ-DER-AGGR-PHASE1",
+            "VG-PRJ-DER-TRAINING-FY2027"
+          ],
+          "affected_document_ids": [
+            "VG-DOC-DER-OPS-PROC-v3.2",
+            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
+          ],
           "recommended_action": "amend",
           "routing_destination": "market_ops"
         },
         {
           "change_match": ["added", null, 3],
-          "affected_obligation_ids": ["VG-OBL-DER-TEL-01"],
-          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1", "VG-PRJ-AMI-TELEMETRY-UPGRADE"],
-          "affected_document_ids": ["VG-DOC-DER-OPS-PROC-v3.2"],
+          "affected_obligation_ids": [
+            "VG-OBL-DER-TEL-01",
+            "VG-OBL-DER-METER-01"
+          ],
+          "affected_project_ids": [
+            "VG-PRJ-DER-AGGR-PHASE1",
+            "VG-PRJ-AMI-TELEMETRY-UPGRADE"
+          ],
+          "affected_document_ids": [
+            "VG-DOC-DER-OPS-PROC-v3.2",
+            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
+          ],
           "recommended_action": "amend",
           "routing_destination": "it_metering"
         }

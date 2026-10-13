@@ -505,7 +505,7 @@ def test_load_gold_parses_extended_fields():
   assert len(case.expected_verifications) == 3
   assert case.expected_verifications[2].prior_verified is None
   assert case.expected_extractions is not None
-  assert len(case.expected_extractions) == 5
+  assert len(case.expected_extractions) == 7
   assert case.expected_mappings is not None
   assert len(case.expected_mappings) == 3
   assert case.company_context_tenant == 'verdant_grid'

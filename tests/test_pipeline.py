@@ -279,9 +279,9 @@ def test_enqueue_mapping_raises_on_mismatched_change_id():
 def test_pipeline_end_to_end_produces_expected_counts(verdant_grid_seeded):
   result = run_pipeline('verdant_grid', 'prod', dry_run=False)
   assert len(result.versions) == 2
-  assert len(result.obligations) == 3
-  assert len(result.projects) == 2
-  assert len(result.documents) == 2
+  assert len(result.obligations) == 8
+  assert len(result.projects) == 3
+  assert len(result.documents) == 5
   assert len(result.changes) == 3
   assert len(result.extracted) == 2
   assert len(result.mappings) == 3

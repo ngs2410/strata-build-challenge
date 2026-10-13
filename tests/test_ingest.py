@@ -53,9 +53,9 @@ def test_ingest_proceeding_version_empty_text_produces_zero_passages(tmp_path):
 
 def test_ingest_company_context_returns_expected_counts(verdant_grid_seeded):
   obligations, projects, documents = ingest_company_context('verdant_grid', 'prod')
-  assert len(obligations) == 3
-  assert len(projects) == 2
-  assert len(documents) == 2
+  assert len(obligations) == 8
+  assert len(projects) == 3
+  assert len(documents) == 5
   assert all(o.tenant_id == 'verdant_grid' for o in obligations)
   assert all(p.tenant_id == 'verdant_grid' for p in projects)
   assert all(d.tenant_id == 'verdant_grid' for d in documents)

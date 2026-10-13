@@ -158,8 +158,11 @@ class ModelCaller:
     print(f'\n{"-" * 70}')
     print(f'[model_caller] task={task_name} model={task_config.model_identifier}')
     print(f'[model_caller] estimated_tokens={estimated_tokens} inputs=({inputs_summary})')
-    print(f'[model_caller] prompt:\n{rendered}')
-    print(f'{"-" * 70}')
+    print('[model_caller] prompt:')
+    for message in rendered:
+      print(f'\n--- {message["role"]} ---')
+      print(message['content'])
+    print(f'\n{"-" * 70}')
     answer = input('[model_caller] Proceed? (y/n): ').strip().lower()
     if answer != 'y' and answer != '':
       raise RuntimeError(f'operator declined {task_name} at --confirm_llm prompt')

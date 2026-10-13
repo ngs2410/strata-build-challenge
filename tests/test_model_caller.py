@@ -163,7 +163,10 @@ def test_confirm_llm_prompts_and_proceeds_on_blank_input(
   response = caller.call(
     task_name='version_diff',
     params={
-      'input': [{'role': 'user', 'content': 'confirm-test'}],
+      'input': [
+        {'role': 'system', 'content': 'system-content-marker'},
+        {'role': 'user', 'content': 'user-content-marker\nsecond-line'},
+      ],
       'inputs_dict': {'passage_text': 'short passage'},
       'prior': prior,
       'final': final,
@@ -178,6 +181,14 @@ def test_confirm_llm_prompts_and_proceeds_on_blank_input(
   assert '[model_caller] task=version_diff' in stdout
   assert 'estimated_tokens=' in stdout
   assert 'Passage text=' in stdout  # the INPUT_LABELS mapping for passage_text
+  # Prompt messages are rendered with role headers and real newlines
+  # (not a dense Python-repr dump with escaped \n).
+  assert '--- system ---' in stdout
+  assert '--- user ---' in stdout
+  assert 'system-content-marker' in stdout
+  # Real newline, not escaped — multi-line content must span lines in stdout.
+  assert 'user-content-marker\nsecond-line' in stdout
+  assert "\\n" not in stdout.split('[model_caller] prompt:')[1].split('-' * 70)[0]
 
 
 def test_confirm_llm_prompts_and_proceeds_on_lowercase_y(

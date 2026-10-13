@@ -66,7 +66,7 @@ That capability is not a search tool and not an alert feed. It is a workspace th
 4. **Map.** For each material change, Strata identifies the specific Verdant obligations, projects, and documents it affects, with the mapping rationale cited to both the regulatory passage and the Verdant-side field it matched.
 5. **Recommend & route.** For each affected item, Strata recommends an action (`review`, `amend`, or `no-op`) and routes it to a *primary* internal destination (one of Market Operations, Legal, or IT & Metering) with a rationale. v1 ships single-destination routing per change; multi-reviewer routing (primary + CC, or parallel destinations) is a known limitation — see §7.
 6. **Escalate.** When the system's confidence in an interpretation is low, the item is routed to Rachel for triage instead of silently committed. The confidence threshold is a tunable setting per tenant.
-7. **Review & audit.** Rachel opens the Strata workspace, sees a prioritized review queue, and approves, overrides, or escalates each item. Every approval, override, and status change is written to an append-only audit log. Rachel can roll back the project state to any prior point in time.
+7. **Review & audit.** Rachel opens the Strata workspace, sees a prioritized review queue, and approves, overrides, or escalates each item. Every approval, override, and status change is written to an append-only audit log, viewable as a read-only chronological page per tenant. Rolling the project state back to a prior point in time is deferred to future work along with the pure-fold-over-log architecture that supports it (see TDD §8.8).
 
 ### What makes this the wedge, not a bigger first bite
 

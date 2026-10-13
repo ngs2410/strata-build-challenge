@@ -698,9 +698,20 @@ is replay-to-timestamp.
   Priority is a function of `mapping.confidence` × a severity proxy
   (number of affected items).
 - **Escalation gate**: on construction, if `mapping.confidence <
-  DomainConfig.escalation.mapping_threshold` (default 3 on the 0–5
-  scale), the `ReviewItem` is created with `status='escalated'`
+  threshold`, the `ReviewItem` is created with `status='escalated'`
   immediately — bypasses the auto-approval path per CLAUDE.md invariant.
+  `threshold` is a two-tier function of the underlying `Change`'s
+  citation state (0–5 integer scale):
+  - If any `Change.prior_citation` / `Change.new_citation` is
+    `verified=False`, use `DomainConfig.escalation.citation_threshold`
+    (default 3). The semantic: a Mapping riding on an unverified
+    citation needs a stricter confidence floor to clear
+    auto-approval — the citation might be hallucinated and the
+    reviewer should get the item regardless of how confident the
+    mapper is.
+  - Otherwise use `DomainConfig.escalation.mapping_threshold`
+    (default 3). The common path.
+  Both knobs are per-tenant tunable via `DomainConfig.escalation`.
 - `src/audit_log.py` owns the append-only JSONL log at
   `data/tenants/<tenant>/<environment>/audit_log.jsonl`. Every state
   transition appends an `AuditEvent`.

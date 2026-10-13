@@ -118,7 +118,8 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
   logger.info('map.done', mappings=len(mappings))
 
   logger.info('review_queue.start')
-  review_items = [enqueue_mapping(m, result.config) for m in mappings]
+  changes_by_id = {c.change_id: c for c in changes}
+  review_items = [enqueue_mapping(m, changes_by_id[m.change_id], result.config) for m in mappings]
   result.review_items = review_items
   if not dry_run:
     review_item_store.save_all(tenant_id, environment, review_items)

@@ -70,18 +70,36 @@ def _change(change_type, prior_citation=None, new_citation=None):
   )
 
 
-def _mapping(confidence, affected_items=()):
+def _mapping(confidence, affected_items=(), change_id='c-1'):
   return Mapping(
     mapping_id='m',
     tenant_id='t',
     environment='e',
-    change_id='c',
+    change_id=change_id,
     affected_items=tuple(affected_items),
     recommended_action='review',
     routing_destination='legal',
     confidence=confidence,
     confidence_rationale='r',
     rationale='r',
+  )
+
+
+def _verified_citation() -> Citation:
+  return Citation(
+    passage_id='proc:v:§1:p1',
+    start_offset=0,
+    end_offset=10,
+    verified=True,
+    verification_rationale='verified in test',
+  )
+
+
+def _verified_change(change_type='tightened'):
+  return _change(
+    change_type,
+    prior_citation=_verified_citation(),
+    new_citation=_verified_citation(),
   )
 
 
@@ -197,12 +215,12 @@ def test_map_change_translates_llm_index_response_into_item_ids(verdant_grid_see
 
 
 def test_enqueue_mapping_escalates_below_threshold():
-  item = enqueue_mapping(_mapping(confidence=2), _config(threshold=3))
+  item = enqueue_mapping(_mapping(confidence=2), _verified_change(), _config(threshold=3))
   assert item.status == 'escalated'
 
 
 def test_enqueue_mapping_pending_at_threshold():
-  item = enqueue_mapping(_mapping(confidence=3), _config(threshold=3))
+  item = enqueue_mapping(_mapping(confidence=3), _verified_change(), _config(threshold=3))
   assert item.status == 'pending'
 
 
@@ -215,11 +233,47 @@ def test_enqueue_mapping_priority_increases_with_affected_items():
     ),
   )
   smaller = _mapping(confidence=4)
-  bigger_item = enqueue_mapping(bigger, _config(threshold=3))
-  smaller_item = enqueue_mapping(smaller, _config(threshold=3))
+  change = _verified_change()
+  bigger_item = enqueue_mapping(bigger, change, _config(threshold=3))
+  smaller_item = enqueue_mapping(smaller, change, _config(threshold=3))
   assert bigger_item.priority > smaller_item.priority
   assert bigger_item.priority == 4 * 3  # confidence × (1 + affected_count)
   assert smaller_item.priority == 4 * 1
+
+
+def test_enqueue_mapping_uses_citation_threshold_when_citation_unverified():
+  config = DomainConfig(
+    escalation=EscalationConfig(mapping_threshold=2, citation_threshold=5),
+    task_model_configs={},
+  )
+  unverified = Citation(
+    passage_id='proc:v:§1:p1',
+    start_offset=0,
+    end_offset=10,
+    verified=False,
+    verification_rationale='unverified in test',
+  )
+  change = _change('tightened', prior_citation=unverified, new_citation=unverified)
+  item = enqueue_mapping(_mapping(confidence=4), change, config)
+  assert item.status == 'escalated'
+
+
+def test_enqueue_mapping_uses_mapping_threshold_when_citations_verified():
+  config = DomainConfig(
+    escalation=EscalationConfig(mapping_threshold=2, citation_threshold=5),
+    task_model_configs={},
+  )
+  item = enqueue_mapping(_mapping(confidence=4), _verified_change(), config)
+  assert item.status == 'pending'
+
+
+def test_enqueue_mapping_raises_on_mismatched_change_id():
+  with pytest.raises(ValueError, match='does not match'):
+    enqueue_mapping(
+      _mapping(confidence=4, change_id='c-1'),
+      _change('tightened').model_copy(update={'change_id': 'c-OTHER'}),
+      _config(threshold=3),
+    )
 
 
 def test_pipeline_end_to_end_produces_expected_counts(verdant_grid_seeded):

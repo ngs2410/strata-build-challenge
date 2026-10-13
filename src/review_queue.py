@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from src.audit_log import log_event
-from src.config import DomainConfig, Mapping, ReviewItem
+from src.config import Change, DomainConfig, Mapping, ReviewItem
 from src.stores import review_item_store
 
 ReviewAction = Literal['approve', 'override', 'escalate']
@@ -20,8 +20,13 @@ _ACTION_TO_EVENT_KIND: dict[str, str] = {
 }
 
 
-def enqueue_mapping(mapping: Mapping, config: DomainConfig) -> ReviewItem:
-  threshold = config.escalation.mapping_threshold
+def enqueue_mapping(mapping: Mapping, change: Change, config: DomainConfig) -> ReviewItem:
+  if mapping.change_id != change.change_id:
+    raise ValueError(
+      f'mapping.change_id={mapping.change_id} does not match '
+      f'change.change_id={change.change_id}'
+    )
+  threshold = _escalation_threshold(change, config)
   status = 'escalated' if mapping.confidence < threshold else 'pending'
   priority = _compute_priority(mapping)
   return ReviewItem(
@@ -33,6 +38,19 @@ def enqueue_mapping(mapping: Mapping, config: DomainConfig) -> ReviewItem:
     status=status,  # type: ignore[arg-type]
     created_at=datetime.now(timezone.utc),
   )
+
+
+def _escalation_threshold(change: Change, config: DomainConfig) -> int:
+  if _has_unverified_citation(change):
+    return config.escalation.citation_threshold
+  return config.escalation.mapping_threshold
+
+
+def _has_unverified_citation(change: Change) -> bool:
+  for citation in (change.prior_citation, change.new_citation):
+    if citation is not None and not citation.verified:
+      return True
+  return False
 
 
 def apply_action(

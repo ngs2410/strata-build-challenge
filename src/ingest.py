@@ -7,17 +7,17 @@ import orjson
 from src.config import Document, Obligation, Passage, ProceedingVersion, Project
 from src.stores import DATA_DIR, document_store, obligation_store, proceeding_store, project_store
 
-SECTION_HEADER_RE = re.compile(r'^§([\d.]+)(?:\(([^)]+)\))*\s')
+SECTION_HEADER_RE = re.compile(r'^§([\d.]+)((?:\([^)]+\))*)\s')
+SECTION_SUB_RE = re.compile(r'\(([^)]+)\)')
 
 
 def _passage_id(
   proceeding_id: str, version_id: str, section_path: tuple[str, ...], position: int
 ) -> str:
-  section_str = (
-    '§' + '('.join(section_path).rstrip('(')
-    if len(section_path) == 1
-    else (section_path[0] + ''.join(f'({p})' for p in section_path[1:]))
-  )
+  if not section_path:
+    section_str = ''
+  else:
+    section_str = section_path[0] + ''.join(f'({p})' for p in section_path[1:])
   return f'{proceeding_id}:{version_id}:{section_str}:p{position}'
 
 
@@ -32,8 +32,8 @@ def _parse_passages(text: str, proceeding_id: str, version_id: str) -> tuple[Pas
     match = SECTION_HEADER_RE.match(para)
     if match:
       base = match.group(1)
-      extras = [g for g in match.groups()[1:] if g]
-      current_section = (f'§{base}', *extras)
+      subs = tuple(SECTION_SUB_RE.findall(match.group(2)))
+      current_section = (f'§{base}', *subs)
       position = 0
       continue
     position += 1

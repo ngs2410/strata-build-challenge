@@ -155,11 +155,6 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
     ),
     task=('Compare the prior and new versions below and return a list of material changes.'),
     details=(
-      'Worked examples — the two confusable cases this classifier has '
-      'historically got wrong. Drawn from adjacent regulatory domains '
-      '(SEC and HHS) so the model learns the pattern rather than '
-      'memorising the current input.\n'
-      '\n'
       'Example 1 — "regulator removes a floor that protected the '
       'regulated entity" (regulated-entity perspective dominates):\n'
       '  Prior passage (hypothetical SEC rule): "A broker-dealer\'s '

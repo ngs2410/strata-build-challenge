@@ -86,6 +86,7 @@ env3.12/bin/pip install --upgrade pip
 env3.12/bin/pip install -e '.[dev]'
 cp .env.example .env
 # Edit .env and set OPENAI_API_KEY=sk-...
+source env3.12/bin/activate
 ```
 
 The `env3.12` directory name is what the [`Makefile`](Makefile)
@@ -98,7 +99,7 @@ documents every env variable the pipeline reads.
 ## Run the tests
 
 ```
-env3.12/bin/pytest tests/
+pytest tests/
 ```
 
 The suite is network-free (an autouse fixture in
@@ -116,8 +117,7 @@ Also useful:
 ## Run the pipeline end-to-end
 
 ```
-env3.12/bin/python -m scripts.main_detect_changes \
-  --tenant_id=verdant_grid --environment=prod
+python -m scripts.main_detect_changes --tenant_id=verdant_grid --environment=prod
 ```
 
 This drives [`scripts/main_detect_changes.py`](scripts/main_detect_changes.py)
@@ -164,7 +164,7 @@ Script flags (all optional):
 ## Open the review UI
 
 ```
-env3.12/bin/python -m scripts.main_review
+python -m scripts.main_review
 ```
 
 [`scripts/main_review.py`](scripts/main_review.py) is a thin uvicorn
@@ -195,7 +195,7 @@ auto-reload).
 ## Run the evals
 
 ```
-env3.12/bin/python -m scripts.main_eval
+python -m scripts.main_eval
 ```
 
 [`scripts/main_eval.py`](scripts/main_eval.py) runs the full pipeline

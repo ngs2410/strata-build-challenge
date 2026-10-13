@@ -8,6 +8,9 @@ env3.12/
 env3.12
 env3.12-ft
 training_data
+*.egg-info/
+build/
+dist/
 
 # IDE
 .vscode/
@@ -33,3 +36,14 @@ mutants/
 .llm_cache
 .embedding_cache
 .model_cache/
+
+# Generated pipeline outputs — regenerate via scripts/main_detect_changes.py
+data/tenants/*/*/proceedings.json
+data/tenants/*/*/obligations.json
+data/tenants/*/*/projects.json
+data/tenants/*/*/documents.json
+data/tenants/*/*/changes.json
+data/tenants/*/*/extracted_obligations.json
+data/tenants/*/*/mappings.json
+data/tenants/*/*/review_items.json
+data/tenants/*/*/audit_log.jsonl

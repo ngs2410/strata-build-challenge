@@ -1,0 +1,6 @@
+{
+  "escalation": {
+    "mapping_threshold": 3,
+    "citation_threshold": 3
+  }
+}

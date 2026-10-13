@@ -1,0 +1,83 @@
+{
+  "obligations": [
+    {
+      "obligation_id": "VG-OBL-DER-REG-01",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "obligation_type": "procedural",
+      "summary": "Register each DER in an aggregation with MISO before market participation.",
+      "full_text": "Verdant Grid shall register each distributed energy resource participating in a MISO aggregation prior to the resource's first market activity, providing physical location and operational characteristics per the MISO tariff.",
+      "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(B); MISO Tariff Module C §38.6",
+      "status": "active",
+      "owner": "market_ops"
+    },
+    {
+      "obligation_id": "VG-OBL-DER-TEL-01",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "obligation_type": "operational",
+      "summary": "Maintain telemetry feed for aggregated DER resources.",
+      "full_text": "Verdant Grid's DER aggregation operations shall maintain a continuous telemetry feed to MISO for all aggregated resources participating in wholesale markets.",
+      "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(C)",
+      "status": "active",
+      "owner": "it_metering"
+    },
+    {
+      "obligation_id": "VG-OBL-DER-SIZE-01",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "obligation_type": "procedural",
+      "summary": "Honor RTO-set minimum aggregation size thresholds where applicable.",
+      "full_text": "Where the RTO establishes a minimum size requirement for DER aggregations, Verdant Grid's aggregation offers shall meet or exceed the published threshold.",
+      "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(A)",
+      "status": "proposed",
+      "owner": "market_ops"
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "VG-PRJ-DER-AGGR-PHASE1",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "name": "MISO DER Aggregation Program — Phase 1",
+      "description": "Launch DER aggregation participation in MISO energy markets for behind-the-meter solar + storage.",
+      "status": "in_progress",
+      "related_obligations": ["VG-OBL-DER-REG-01", "VG-OBL-DER-TEL-01"],
+      "owner": "market_ops"
+    },
+    {
+      "project_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "name": "AMI Telemetry Upgrade for Behind-the-Meter Resources",
+      "description": "Deploy telemetry streaming from AMI endpoints to support DER aggregation reporting.",
+      "status": "planned",
+      "related_obligations": ["VG-OBL-DER-TEL-01"],
+      "owner": "it_metering"
+    }
+  ],
+  "documents": [
+    {
+      "document_id": "VG-DOC-DER-OPS-PROC-v3.2",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "document_type": "procedure",
+      "title": "DER Aggregation Operating Procedure v3.2",
+      "summary": "Internal operating procedure covering DER registration, telemetry, and market offer submission.",
+      "full_text": "This procedure governs how Verdant Grid's DER aggregation team registers resources with MISO, maintains telemetry, and submits market offers. See §4 for registration workflow.",
+      "last_reviewed_at": "2026-07-01T00:00:00Z",
+      "owner": "market_ops"
+    },
+    {
+      "document_id": "VG-DOC-TARIFF-FILING-2026Q4",
+      "tenant_id": "verdant_grid",
+      "environment": "prod",
+      "document_type": "tariff_filing",
+      "title": "Draft Tariff Filing — DER Aggregation Compliance (2026 Q4)",
+      "summary": "Draft Verdant Grid tariff filing responding to MISO's Order 2222 compliance plan.",
+      "full_text": "Draft filing addresses aggregator registration lead time, telemetry obligations, and minimum size interoperability.",
+      "last_reviewed_at": "2026-09-15T00:00:00Z",
+      "owner": "legal"
+    }
+  ]
+}

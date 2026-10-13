@@ -1,0 +1,24 @@
+§35.28(g)(1)(ix) Distributed energy resource aggregations.
+
+(A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+Regional Transmission Organization or Independent System Operator may
+establish a minimum size requirement for the aggregated resources that
+does not exceed 100 kW.
+
+(B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator at least 60 days before the
+distributed energy resource participates in the aggregation. The
+registration shall include the physical location, the point of
+interconnection, and the physical and operational characteristics of
+each distributed energy resource.
+
+(C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding, and shall
+provide a telemetry feed for aggregated resources rated at or above 100
+kW.

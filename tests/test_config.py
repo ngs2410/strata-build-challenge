@@ -135,6 +135,10 @@ def test_load_domain_config_reads_default_file():
   assert isinstance(config, DomainConfig)
   assert config.escalation.mapping_threshold == 3
   assert config.escalation.citation_threshold == 3
+  assert config.mapping.candidate_set_size == 50
+  assert config.mapping.context_window_tokens == 20000
+  assert config.citation.verification_required is True
+  assert config.citation.min_citation_span_chars == 10
 
 
 def test_load_domain_config_deep_merges_tenant_override(tmp_path, monkeypatch):

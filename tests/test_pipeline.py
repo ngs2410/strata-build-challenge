@@ -8,9 +8,11 @@ from src.config import (
   AffectedItem,
   Change,
   Citation,
+  CitationConfig,
   DomainConfig,
   EscalationConfig,
   Mapping,
+  MappingConfig,
   Passage,
   ProceedingVersion,
 )
@@ -106,6 +108,8 @@ def _verified_change(change_type='tightened'):
 def _config(threshold):
   return DomainConfig(
     escalation=EscalationConfig(mapping_threshold=threshold, citation_threshold=3),
+    mapping=MappingConfig(candidate_set_size=50, context_window_tokens=20000),
+    citation=CitationConfig(verification_required=True, min_citation_span_chars=10),
     task_model_configs={},
   )
 
@@ -152,6 +156,25 @@ def test_ground_citations_raises_on_unknown_passage_id():
   )
   with pytest.raises(ValueError, match='unknown passage_id'):
     ground_citations([_change('tightened', prior_citation=bogus)], nopr, final)
+
+
+def test_ground_citations_marks_unverified_when_span_below_min(verdant_grid_seeded):
+  del verdant_grid_seeded
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  # min_citation_span_chars defaults to 10 in the Verdant config. A 3-char
+  # span (0-3) is below that floor and must flip verified=False with a
+  # specific rationale, so citation_threshold at review time picks it up.
+  narrow = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=3,
+    verified=False,
+    verification_rationale='pending',
+  )
+  grounded = ground_citations([_change('tightened', prior_citation=narrow)], nopr, final)
+  assert grounded[0].prior_citation.verified is False
+  assert 'min_citation_span_chars' in grounded[0].prior_citation.verification_rationale
 
 
 def test_verify_citations_sets_verified_true_for_known_passage():
@@ -244,6 +267,8 @@ def test_enqueue_mapping_priority_increases_with_affected_items():
 def test_enqueue_mapping_uses_citation_threshold_when_citation_unverified():
   config = DomainConfig(
     escalation=EscalationConfig(mapping_threshold=2, citation_threshold=5),
+    mapping=MappingConfig(candidate_set_size=50, context_window_tokens=20000),
+    citation=CitationConfig(verification_required=True, min_citation_span_chars=10),
     task_model_configs={},
   )
   unverified = Citation(
@@ -261,6 +286,8 @@ def test_enqueue_mapping_uses_citation_threshold_when_citation_unverified():
 def test_enqueue_mapping_uses_mapping_threshold_when_citations_verified():
   config = DomainConfig(
     escalation=EscalationConfig(mapping_threshold=2, citation_threshold=5),
+    mapping=MappingConfig(candidate_set_size=50, context_window_tokens=20000),
+    citation=CitationConfig(verification_required=True, min_citation_span_chars=10),
     task_model_configs={},
   )
   item = enqueue_mapping(_mapping(confidence=4), _verified_change(), config)

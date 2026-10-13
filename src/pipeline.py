@@ -77,7 +77,10 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
   logger.info('diff.start', prior=nopr.version_id, final=final.version_id)
   changes = detect_changes(nopr, final)
   changes = ground_citations(changes, nopr, final)
-  changes = verify_citations(changes, nopr, final)
+  if result.config.citation.verification_required:
+    changes = verify_citations(changes, nopr, final)
+  else:
+    logger.info('verify.skipped', reason='citation.verification_required=false')
   result.changes = changes
   if not dry_run:
     change_store.save_all(tenant_id, environment, changes)

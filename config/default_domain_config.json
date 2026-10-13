@@ -3,6 +3,14 @@
     "mapping_threshold": 3,
     "citation_threshold": 3
   },
+  "mapping": {
+    "candidate_set_size": 50,
+    "context_window_tokens": 20000
+  },
+  "citation": {
+    "verification_required": true,
+    "min_citation_span_chars": 10
+  },
   "task_model_configs": {
     "version_diff": {
       "model_identifier": "openai://gpt-5.4-nano",

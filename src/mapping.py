@@ -2,7 +2,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from src.config import AffectedItem, Change, Document, Mapping, Obligation, Project
+from src.config import (
+  AffectedItem,
+  Change,
+  Document,
+  Mapping,
+  Obligation,
+  Project,
+  load_domain_config,
+)
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
 from src.prompt_calibration import CONFIDENCE_LEVEL_RUBRIC
@@ -77,6 +85,7 @@ def build_mapping_prompt(
   obligations: list[Obligation],
   projects: list[Project],
   documents: list[Document],
+  candidate_set_size: int,
 ) -> PromptSpec:
   change_summary = (
     f'change_type={change.change_type}\n'
@@ -85,13 +94,15 @@ def build_mapping_prompt(
   )
   obligation_list = '\n'.join(
     f'[{i}] {o.obligation_id} ({o.obligation_type}, {o.status}): {o.summary}'
-    for i, o in enumerate(obligations)
+    for i, o in enumerate(obligations[:candidate_set_size])
   )
   project_list = '\n'.join(
-    f'[{i}] {p.project_id} ({p.status}): {p.name}' for i, p in enumerate(projects)
+    f'[{i}] {p.project_id} ({p.status}): {p.name}'
+    for i, p in enumerate(projects[:candidate_set_size])
   )
   document_list = '\n'.join(
-    f'[{i}] {d.document_id} ({d.document_type}): {d.title}' for i, d in enumerate(documents)
+    f'[{i}] {d.document_id} ({d.document_type}): {d.title}'
+    for i, d in enumerate(documents[:candidate_set_size])
   )
   return PromptSpec(
     system_prompt=(
@@ -195,7 +206,12 @@ def map_change(
   projects: list[Project],
   documents: list[Document],
 ) -> Mapping:
-  prompt = build_mapping_prompt(change, obligations, projects, documents)
+  config = load_domain_config(change.tenant_id, change.environment)
+  candidate_set_size = config.mapping.candidate_set_size
+  obligations = obligations[:candidate_set_size]
+  projects = projects[:candidate_set_size]
+  documents = documents[:candidate_set_size]
+  prompt = build_mapping_prompt(change, obligations, projects, documents, candidate_set_size)
   system, user = prompt.render()
   response = model_caller.call(
     task_name=TASK_NAME,

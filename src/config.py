@@ -174,6 +174,18 @@ class EscalationConfig(BaseModel):
   citation_threshold: int
 
 
+class MappingConfig(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  candidate_set_size: int
+  context_window_tokens: int
+
+
+class CitationConfig(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  verification_required: bool
+  min_citation_span_chars: int
+
+
 class TaskModelConfig(BaseModel):
   model_config = ConfigDict(extra='forbid')
   model_identifier: str
@@ -186,6 +198,8 @@ class TaskModelConfig(BaseModel):
 class DomainConfig(BaseModel):
   model_config = ConfigDict(extra='forbid')
   escalation: EscalationConfig
+  mapping: MappingConfig
+  citation: CitationConfig
   task_model_configs: dict[str, TaskModelConfig]
 
 

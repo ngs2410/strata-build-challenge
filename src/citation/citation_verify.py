@@ -38,6 +38,13 @@ Short-circuit on failed grounding:
     reported as semantically verified, and (b) at gpt-5.4-nano the
     verifier would otherwise vote "true" on an empty span and silently
     launder a grounding failure into a verified citation.
+  * When a batch has a mix of pending and already-failed sides, the
+    prompt renders failed sides as `GROUNDING_FAILED_MARKER` rather
+    than passage-text-plus-empty-span. The Steps and Pitfalls sections
+    tell the LLM to emit `verified=null, rationale=null` for those
+    sides. The merge step enforces the preservation regardless of what
+    the LLM actually emits — the prompt-side instruction is a
+    distraction-reducing nicety, not a correctness-load-bearing one.
 
 The LLM is instructed to quote the specific supporting phrase in its
 rationale, so a reviewer scanning an "unverified" item can see WHY — not
@@ -58,6 +65,8 @@ from src.model_caller import model_caller
 TASK_NAME = 'citation_verify'
 
 STUB_RATIONALE = 'stub verifier: cited passage trivially supports claim at v1 scale'
+
+GROUNDING_FAILED_MARKER = 'GROUNDING_FAILED (do not verify this side — handled upstream)'
 
 CITATION_VERIFY_JSON_EXAMPLE = """{
   "verifications": [
@@ -144,7 +153,10 @@ def build_citation_verify_prompt(
       '4. Verified=true requires the span to substantively support the '
       'specific claim in description — not merely sit in the right paragraph.\n'
       '5. For null citations (added has null prior; removed has null new): '
-      'verified=null and rationale=null.'
+      'verified=null and rationale=null.\n'
+      f'6. For sides rendered as "{GROUNDING_FAILED_MARKER}": emit '
+      'verified=null and rationale=null — the grounding failure is '
+      'already recorded upstream.'
     ),
     details=(
       'Example 1 — strong support (verified=true):\n'
@@ -211,7 +223,12 @@ def build_citation_verify_prompt(
       'new parameter named in the description. A tightened/loosened '
       "prior_citation shows the pre-change parent obligation; it is CORRECT "
       'for it not to contain the tightening parameter — that lives in the '
-      'new_citation. See Example 3.'
+      'new_citation. See Example 3.\n'
+      f'- When a citation side is rendered as "{GROUNDING_FAILED_MARKER}", '
+      'the structural grounding step upstream could not locate the citing '
+      'span in the passage. That side is already recorded as unverified; '
+      'emit verified=null and rationale=null for it. Do NOT attempt to '
+      'verify from the description alone.'
     ),
     field_intents=(
       '- change_index: 0-based index into the input change list (the "[N]" '
@@ -324,6 +341,8 @@ def _render_change_block(index: int, change: Change, passages_by_id: dict) -> st
 def _render_citation(label: str, citation: Citation | None, passages_by_id: dict) -> str:
   if citation is None:
     return f'{label}_citation: null'
+  if not is_grounding_pending(citation):
+    return f'{label}_citation: {GROUNDING_FAILED_MARKER}'
   passage = passages_by_id.get(citation.passage_id)
   if passage is None:
     raise ValueError(

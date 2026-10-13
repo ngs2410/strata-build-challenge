@@ -8,7 +8,11 @@ from src.citation.citation_grounding import (
   ground_citations_for_changes,
   ground_obligations,
 )
-from src.citation.citation_verify import build_citation_verify_prompt, verify_citations
+from src.citation.citation_verify import (
+  GROUNDING_FAILED_MARKER,
+  build_citation_verify_prompt,
+  verify_citations,
+)
 from src.citation.llm_citation import LlmCitation
 from src.config import (
   AffectedItem,
@@ -338,6 +342,62 @@ def test_citation_verify_prompt_has_steps_details_pitfalls_sections():
   pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
   assert 'topically relevant' in pitfalls_section
   assert 'paraphrase' in pitfalls_section.lower()
+
+
+def test_citation_verify_prompt_renders_failed_grounding_sides_as_marker():
+  # A grounding-failed side wastes tokens and distracts the model when
+  # rendered as "passage text: ... / citing span: """ (empty). It should
+  # render as a terse GROUNDING_FAILED marker so the LLM focuses on the
+  # pending sides. Correctness is still guaranteed by the merge-step
+  # preservation; this is a distraction-reduction nicety.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  pending = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=29,
+    verified=False,
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
+  )
+  failed = Citation(
+    passage_id='proc:final:§1:p1',
+    start_offset=0,
+    end_offset=0,
+    verified=False,
+    verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
+  )
+  prompt = build_citation_verify_prompt(
+    [_change('tightened', prior_citation=pending, new_citation=failed)], nopr, final
+  )
+  _, user = prompt.render()
+  # Pending side: full passage + span rendered.
+  assert 'The aggregator shall register' in user
+  # Failed side: terse marker, no passage text, no empty citing span.
+  assert f'new_citation: {GROUNDING_FAILED_MARKER}' in user
+  # The failed passage text must NOT appear a second time under new_citation.
+  new_citation_section = user.split('new_citation:')[1].split('[')[0]
+  assert 'passage text' not in new_citation_section
+  assert 'citing span' not in new_citation_section
+
+
+def test_citation_verify_prompt_pitfalls_name_the_grounding_failed_marker():
+  # The LLM needs to know what to do when it sees the marker: emit
+  # verified=null + rationale=null, don't try to verify from description.
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  citation = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=29,
+    verified=False,
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
+  )
+  prompt = build_citation_verify_prompt(
+    [_change('tightened', prior_citation=citation)], nopr, final
+  )
+  _, user = prompt.render()
+  assert GROUNDING_FAILED_MARKER in user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert GROUNDING_FAILED_MARKER in user.split('## Steps')[1].split('## Details')[0]
 
 
 def test_citation_verify_prompt_does_not_leak_structural_metadata():

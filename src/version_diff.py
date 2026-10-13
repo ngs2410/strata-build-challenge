@@ -19,19 +19,69 @@ VERSION_DIFF_JSON_EXAMPLE = """{
       "change_type": "<added|removed|tightened|loosened|cosmetic>",
       "description": "<one-sentence description of the semantic shift>",
       "prior_citation": {
-        "passage_id": "<passage id from the prior version, or null if added>",
+        "passage_id": "<passage id from the prior version>",
         "start_offset": <int>,
         "end_offset": <int>,
         "verified": false,
         "verification_rationale": "pending citation_verify stage"
       },
       "new_citation": {
-        "passage_id": "<passage id from the new version, or null if removed>",
+        "passage_id": "<passage id from the new version>",
         "start_offset": <int>,
         "end_offset": <int>,
         "verified": false,
         "verification_rationale": "pending citation_verify stage"
       },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>",
+      "detected_at": "<ISO-8601 datetime>"
+    }
+  ]
+}
+
+Also valid when change_type="added" — the whole prior_citation object is null:
+{
+  "changes": [
+    {
+      "change_id": "<stable id>",
+      "tenant_id": "<tenant id>",
+      "environment": "<environment>",
+      "proceeding_id": "<proceeding id>",
+      "change_type": "added",
+      "description": "<one-sentence description>",
+      "prior_citation": null,
+      "new_citation": {
+        "passage_id": "<passage id from the new version>",
+        "start_offset": <int>,
+        "end_offset": <int>,
+        "verified": false,
+        "verification_rationale": "pending citation_verify stage"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>",
+      "detected_at": "<ISO-8601 datetime>"
+    }
+  ]
+}
+
+Also valid when change_type="removed" — the whole new_citation object is null:
+{
+  "changes": [
+    {
+      "change_id": "<stable id>",
+      "tenant_id": "<tenant id>",
+      "environment": "<environment>",
+      "proceeding_id": "<proceeding id>",
+      "change_type": "removed",
+      "description": "<one-sentence description>",
+      "prior_citation": {
+        "passage_id": "<passage id from the prior version>",
+        "start_offset": <int>,
+        "end_offset": <int>,
+        "verified": false,
+        "verification_rationale": "pending citation_verify stage"
+      },
+      "new_citation": null,
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
       "confidence_rationale": "<which rubric level you picked and why>",
       "detected_at": "<ISO-8601 datetime>"

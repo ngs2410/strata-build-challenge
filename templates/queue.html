@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Strata — Review Queue ({{tenant_id}} / {{environment}})</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #222; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 0.25em; }
+    nav { margin: 1em 0; }
+    nav a { margin-right: 1em; text-decoration: none; color: #06c; }
+    nav a:hover { text-decoration: underline; }
+    .meta { color: #666; margin-bottom: 1em; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 0.6em 0.5em; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; font-weight: 600; }
+    .status { font-weight: 600; }
+    .status-pending { color: #c80; }
+    .status-approved { color: #080; }
+    .status-overridden { color: #d44; }
+    .status-escalated { color: #c04; }
+    .change-desc { max-width: 500px; font-size: 0.95em; }
+    .affected-list { margin: 0.25em 0 0 1em; padding: 0; font-size: 0.85em; }
+    .affected-list li { margin: 0.15em 0; }
+    .citation { font-size: 0.75em; color: #555; margin-top: 0.3em; }
+    form.action { margin: 0; }
+    textarea { width: 100%; min-height: 3em; font-family: inherit; font-size: 0.9em; box-sizing: border-box; }
+    button { margin-right: 0.25em; margin-top: 0.3em; padding: 0.3em 0.7em; cursor: pointer; font-size: 0.9em; }
+    .btn-approve { background: #cfe8d4; }
+    .btn-override { background: #f7dcdc; }
+    .btn-escalate { background: #f8e4b2; }
+    .empty { color: #888; font-style: italic; margin-top: 2em; }
+    details > summary { cursor: pointer; color: #06c; font-size: 0.9em; }
+    details > div { margin-top: 0.3em; padding: 0.3em 0.5em; background: #f8f8f8; border-left: 2px solid #ccc; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <h1>Strata — Review Queue</h1>
+  <nav>
+    <a href="/queue?tenant_id={{tenant_id}}&environment={{environment}}">Queue</a>
+    <a href="/audit?tenant_id={{tenant_id}}&environment={{environment}}">Audit log</a>
+  </nav>
+  <p class="meta">Tenant: <b>{{tenant_id}}</b> · Environment: <b>{{environment}}</b> · {{rows|length}} review item(s)</p>
+
+  {% if not rows %}
+    <p class="empty">No review items for this tenant / environment yet. Run <code>env3.12/bin/python -m scripts.main_detect_changes</code> to populate.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>Priority</th>
+        <th>Status</th>
+        <th>Change</th>
+        <th>Affected items</th>
+        <th>Confidence · Route · Action</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr>
+        <td>{{row.item.priority}}</td>
+        <td class="status status-{{row.item.status}}">{{row.item.status}}</td>
+        <td class="change-desc">
+          {% if row.change %}
+            <div><b>{{row.change.change_type}}:</b> {{row.change.description}}</div>
+            {% if row.change.new_citation %}
+              <div class="citation">cite (new): <code>{{row.change.new_citation.passage_id}}</code>{% if row.change.new_citation.verified %} ✓{% endif %}</div>
+            {% endif %}
+            {% if row.change.prior_citation %}
+              <div class="citation">cite (prior): <code>{{row.change.prior_citation.passage_id}}</code>{% if row.change.prior_citation.verified %} ✓{% endif %}</div>
+            {% endif %}
+          {% elif row.mapping %}
+            <div><code>{{row.mapping.change_id}}</code></div>
+          {% endif %}
+          {% if row.mapping %}
+            <details><summary>Mapping rationale</summary><div>{{row.mapping.rationale}}</div></details>
+          {% endif %}
+        </td>
+        <td>
+          {% if row.mapping %}
+            <ul class="affected-list">
+            {% for ai in row.mapping.affected_items %}
+              <li>{{ai.item_type}}: <code>{{ai.item_id}}</code> ({{ai.match_confidence}}/5)</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        </td>
+        <td>
+          {% if row.mapping %}
+            <div>conf: {{row.mapping.confidence}}/5</div>
+            <div>route: <b>{{row.mapping.routing_destination}}</b></div>
+            <div>action: <b>{{row.mapping.recommended_action}}</b></div>
+          {% endif %}
+        </td>
+        <td>
+          {% if row.item.status in ['pending', 'escalated'] %}
+          <form class="action" method="post" action="/queue/{{row.item.review_item_id}}/action">
+            <input type="hidden" name="tenant_id" value="{{tenant_id}}">
+            <input type="hidden" name="environment" value="{{environment}}">
+            <textarea name="rationale" placeholder="Why?" required></textarea>
+            <br>
+            <button class="btn-approve" name="action" value="approve">Approve</button>
+            <button class="btn-override" name="action" value="override">Override</button>
+            <button class="btn-escalate" name="action" value="escalate">Escalate</button>
+          </form>
+          {% else %}
+            <em>no action available</em>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</body>
+</html>

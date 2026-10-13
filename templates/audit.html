@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Strata — Audit Log ({{tenant_id}} / {{environment}})</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #222; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 0.25em; }
+    nav { margin: 1em 0; }
+    nav a { margin-right: 1em; text-decoration: none; color: #06c; }
+    nav a:hover { text-decoration: underline; }
+    .meta { color: #666; margin-bottom: 1em; }
+    .note { color: #666; font-style: italic; margin: 1em 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 0.5em; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; font-size: 0.9em; }
+    th { background: #f4f4f4; font-weight: 600; }
+    .timestamp { white-space: nowrap; color: #555; font-family: ui-monospace, monospace; font-size: 0.85em; }
+    .kind { font-weight: 600; }
+    code { font-family: ui-monospace, monospace; font-size: 0.85em; }
+    pre { font-size: 0.75em; max-width: 500px; overflow: auto; background: #f8f8f8; padding: 0.4em; border-left: 2px solid #ccc; margin: 0.3em 0 0 0; }
+    details summary { cursor: pointer; color: #06c; }
+    .empty { color: #888; font-style: italic; margin-top: 2em; }
+  </style>
+</head>
+<body>
+  <h1>Strata — Audit Log</h1>
+  <nav>
+    <a href="/queue?tenant_id={{tenant_id}}&environment={{environment}}">Queue</a>
+    <a href="/audit?tenant_id={{tenant_id}}&environment={{environment}}">Audit log</a>
+  </nav>
+  <p class="meta">Tenant: <b>{{tenant_id}}</b> · Environment: <b>{{environment}}</b> · {{events|length}} event(s), newest first.</p>
+  <p class="note">Read-only view. Rollback is tracked as open question TDD §8.8 and is deferred to future work.</p>
+
+  {% if not events %}
+    <p class="empty">No audit events for this tenant / environment yet.</p>
+  {% else %}
+  <table>
+    <thead>
+      <tr>
+        <th>When</th>
+        <th>Actor</th>
+        <th>Event</th>
+        <th>Target</th>
+        <th>Rationale</th>
+        <th>Payload</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for event in events %}
+      <tr>
+        <td class="timestamp">{{event.occurred_at.isoformat()}}</td>
+        <td>{{event.actor}}</td>
+        <td class="kind">{{event.kind}}</td>
+        <td>{{event.target_type}}:<br><code>{{event.target_id}}</code></td>
+        <td>{{event.rationale or ''}}</td>
+        <td>
+          {% if event.new_value_json %}
+          <details><summary>new value</summary><pre>{{event.new_value_json}}</pre></details>
+          {% endif %}
+          {% if event.prior_value_json %}
+          <details><summary>prior value</summary><pre>{{event.prior_value_json}}</pre></details>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</body>
+</html>

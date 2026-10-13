@@ -119,6 +119,15 @@ def test_cache_key_is_plaintext_json(verdant_grid_seeded, isolated_model_cache):
   assert 'hello' in key
 
 
+def test_set_confirm_llm_toggles_flag():
+  caller = ModelCaller()
+  assert caller._confirm_llm is False
+  caller.set_confirm_llm(True)
+  assert caller._confirm_llm is True
+  caller.set_confirm_llm(False)
+  assert caller._confirm_llm is False
+
+
 def test_cache_key_changes_with_input(verdant_grid_seeded, isolated_model_cache):
   del verdant_grid_seeded
   caller = ModelCaller(cache_dir=isolated_model_cache)

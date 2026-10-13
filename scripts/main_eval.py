@@ -19,6 +19,7 @@ from src.evals import (
 )
 from src.ingest import ingest_company_context, ingest_proceeding_version
 from src.mapping import map_change
+from src.model_caller import model_caller
 from src.obligation_extraction import extract_obligations
 from src.telemetry import configure_logging, get_logger
 from src.version_diff import detect_changes
@@ -32,9 +33,16 @@ flags.DEFINE_string('output_dir', 'output/evals', 'Directory for JSON report out
 flags.DEFINE_boolean('dry_run', False, 'Compute metrics but do not write report to disk')
 flags.DEFINE_integer('k', None, 'Smoke-test: run only first K gold cases')
 flags.DEFINE_boolean('profile', False, 'Run under cProfile; log top 50 functions')
+flags.DEFINE_boolean(
+  'confirm_llm',
+  False,
+  'Interactively confirm each LLM call before dispatch — prints the rendered '
+  'prompt + token-count estimate and prompts y/n. Useful for prompt debugging.',
+)
 
 
 def _run() -> None:
+  model_caller.set_confirm_llm(FLAGS.confirm_llm)
   logger = get_logger()
   gold = load_gold(Path(FLAGS.gold_file))
   cases = list(gold.cases)

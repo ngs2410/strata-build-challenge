@@ -52,6 +52,9 @@ class ModelCaller:
     self._confirm_llm = confirm_llm
     self._log = get_logger()
 
+  def set_confirm_llm(self, confirm_llm: bool) -> None:
+    self._confirm_llm = confirm_llm
+
   def call(
     self,
     task_name: str,

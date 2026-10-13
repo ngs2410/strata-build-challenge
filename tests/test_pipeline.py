@@ -2,8 +2,9 @@ from datetime import datetime, timezone
 
 import pytest
 
-from src.citation.citation_grounding import ground_citations
+from src.citation.citation_grounding import ground_citations_for_changes, ground_obligations
 from src.citation.citation_verify import verify_citations
+from src.citation.llm_citation import LlmCitation
 from src.config import (
   AffectedItem,
   Change,
@@ -20,7 +21,7 @@ from src.mapping import map_change
 from src.obligation_extraction import extract_obligations
 from src.pipeline import run_pipeline
 from src.review_queue import enqueue_mapping
-from src.version_diff import detect_changes
+from src.version_diff import LlmChange, detect_changes
 
 
 def _version(status, version_id):
@@ -58,6 +59,22 @@ def _version(status, version_id):
 
 def _change(change_type, prior_citation=None, new_citation=None):
   return Change(
+    change_id='c-1',
+    tenant_id='verdant_grid',
+    environment='prod',
+    proceeding_id='proc',
+    change_type=change_type,
+    description='d',
+    prior_citation=prior_citation,
+    new_citation=new_citation,
+    confidence=4,
+    confidence_rationale='r',
+    detected_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+  )
+
+
+def _llm_change(change_type, prior_citation=None, new_citation=None):
+  return LlmChange(
     change_id='c-1',
     tenant_id='verdant_grid',
     environment='prod',
@@ -114,14 +131,17 @@ def _config(threshold):
   )
 
 
-def test_detect_changes_returns_three_changes_in_known_order():
+def test_detect_changes_returns_three_llm_changes_in_known_order():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
-  changes = detect_changes(nopr, final)
-  assert [c.change_type for c in changes] == ['loosened', 'tightened', 'added']
-  assert changes[2].prior_citation is None  # 'added' change has no prior
-  assert changes[0].prior_citation is not None
-  assert changes[0].prior_citation.passage_id == 'proc:nopr:§1:p1'
+  llm_changes = detect_changes(nopr, final)
+  assert [c.change_type for c in llm_changes] == ['loosened', 'tightened', 'added']
+  assert llm_changes[2].prior_citation is None  # 'added' change has no prior
+  assert llm_changes[0].prior_citation is not None
+  assert llm_changes[0].prior_citation.passage_id == 'proc:nopr:§1:p1'
+  # LlmCitation carries citing_span (verbatim text), NOT offsets
+  assert llm_changes[0].prior_citation.citing_span
+  assert not hasattr(llm_changes[0].prior_citation, 'start_offset')
 
 
 def test_detect_changes_rejects_mismatched_statuses():
@@ -129,33 +149,39 @@ def test_detect_changes_rejects_mismatched_statuses():
     detect_changes(_version('draft', 'a'), _version('draft', 'b'))
 
 
-def test_ground_citations_clamps_end_offset_to_passage_length():
+def test_ground_citations_finds_substring_and_computes_offsets():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
-  passage_length = len(nopr.passages[0].text)
-  overshoot = Citation(
+  known_span = 'The aggregator shall register'
+  llm_cit = LlmCitation(passage_id='proc:nopr:§1:p1', citing_span=known_span)
+  lc = _llm_change('tightened', prior_citation=llm_cit)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  assert grounded[0].prior_citation.start_offset == 0
+  assert grounded[0].prior_citation.end_offset == len(known_span)
+  assert grounded[0].prior_citation.verified is False  # pending verify stage
+  assert grounded[0].prior_citation.verification_rationale == 'pending citation_verify stage'
+
+
+def test_ground_citations_marks_unverified_when_citing_span_not_found():
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  absent = LlmCitation(
     passage_id='proc:nopr:§1:p1',
-    start_offset=0,
-    end_offset=10_000,
-    verified=False,
-    verification_rationale='pending',
+    citing_span='text that is definitely not in the passage',
   )
-  grounded = ground_citations([_change('tightened', prior_citation=overshoot)], nopr, final)
-  assert grounded[0].prior_citation.end_offset == passage_length
+  lc = _llm_change('tightened', prior_citation=absent)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  assert grounded[0].prior_citation.verified is False
+  assert 'not found' in grounded[0].prior_citation.verification_rationale
 
 
 def test_ground_citations_raises_on_unknown_passage_id():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
-  bogus = Citation(
-    passage_id='proc:nopr:§99:p99',
-    start_offset=0,
-    end_offset=10,
-    verified=False,
-    verification_rationale='pending',
-  )
+  bogus = LlmCitation(passage_id='proc:nopr:§99:p99', citing_span='anything')
+  lc = _llm_change('tightened', prior_citation=bogus)
   with pytest.raises(ValueError, match='unknown passage_id'):
-    ground_citations([_change('tightened', prior_citation=bogus)], nopr, final)
+    ground_citations_for_changes([lc], nopr, final)
 
 
 def test_ground_citations_marks_unverified_when_span_below_min(verdant_grid_seeded):
@@ -163,16 +189,11 @@ def test_ground_citations_marks_unverified_when_span_below_min(verdant_grid_seed
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
   # min_citation_span_chars defaults to 10 in the Verdant config. A 3-char
-  # span (0-3) is below that floor and must flip verified=False with a
+  # citing_span is below that floor and must flip verified=False with a
   # specific rationale, so citation_threshold at review time picks it up.
-  narrow = Citation(
-    passage_id='proc:nopr:§1:p1',
-    start_offset=0,
-    end_offset=3,
-    verified=False,
-    verification_rationale='pending',
-  )
-  grounded = ground_citations([_change('tightened', prior_citation=narrow)], nopr, final)
+  narrow = LlmCitation(passage_id='proc:nopr:§1:p1', citing_span='The')
+  lc = _llm_change('tightened', prior_citation=narrow)
+  grounded = ground_citations_for_changes([lc], nopr, final)
   assert grounded[0].prior_citation.verified is False
   assert 'min_citation_span_chars' in grounded[0].prior_citation.verification_rationale
 
@@ -192,10 +213,16 @@ def test_verify_citations_sets_verified_true_for_known_passage():
 
 
 def test_extract_obligations_produces_one_entry_per_version():
-  extracted = extract_obligations(_version('draft', 'nopr'))
-  assert len(extracted) == 1
-  assert extracted[0].obligation_type == 'procedural'
-  assert extracted[0].citation.verified is True
+  version = _version('draft', 'nopr')
+  llm_extracted = extract_obligations(version)
+  assert len(llm_extracted) == 1
+  assert llm_extracted[0].obligation_type == 'procedural'
+  # LlmExtractedObligation carries LlmCitation with citing_span, not offsets
+  assert llm_extracted[0].citation.citing_span
+  grounded = ground_obligations(llm_extracted, version)
+  assert len(grounded) == 1
+  assert grounded[0].citation.start_offset == 0
+  assert grounded[0].citation.end_offset == len(llm_extracted[0].citation.citing_span)
 
 
 @pytest.mark.parametrize(

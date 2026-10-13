@@ -49,9 +49,11 @@ def test_resolve_backend_raises_on_unknown_prefix(verdant_grid_seeded):
     caller._resolve_backend('unknown://something')
 
 
-def test_call_dispatches_to_stub_and_returns_parsed_response(verdant_grid_seeded):
+def test_call_dispatches_to_stub_and_returns_parsed_response(
+  verdant_grid_seeded, isolated_model_cache
+):
   del verdant_grid_seeded
-  caller = ModelCaller()
+  caller = ModelCaller(cache_dir=isolated_model_cache)
   prior, final = _versions()
   response = caller.call(
     task_name='version_diff',

@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from src.config import Change, Citation, ProceedingVersion
+from src.citation.llm_citation import LlmCitation
+from src.config import ProceedingVersion
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
 from src.prompt_calibration import CHANGE_TYPE_RUBRIC, CONFIDENCE_LEVEL_RUBRIC
@@ -20,17 +22,11 @@ VERSION_DIFF_JSON_EXAMPLE = """{
       "description": "<one-sentence description of the semantic shift>",
       "prior_citation": {
         "passage_id": "<passage id from the prior version>",
-        "start_offset": <int>,
-        "end_offset": <int>,
-        "verified": false,
-        "verification_rationale": "pending citation_verify stage"
+        "citing_span": "<verbatim text copied character-for-character from the cited prior passage>"
       },
       "new_citation": {
         "passage_id": "<passage id from the new version>",
-        "start_offset": <int>,
-        "end_offset": <int>,
-        "verified": false,
-        "verification_rationale": "pending citation_verify stage"
+        "citing_span": "<verbatim text copied character-for-character from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
       "confidence_rationale": "<which rubric level you picked and why>",
@@ -52,10 +48,7 @@ Also valid when change_type="added" — the whole prior_citation object is null:
       "prior_citation": null,
       "new_citation": {
         "passage_id": "<passage id from the new version>",
-        "start_offset": <int>,
-        "end_offset": <int>,
-        "verified": false,
-        "verification_rationale": "pending citation_verify stage"
+        "citing_span": "<verbatim text span from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
       "confidence_rationale": "<which rubric level you picked and why>",
@@ -76,10 +69,7 @@ Also valid when change_type="removed" — the whole new_citation object is null:
       "description": "<one-sentence description>",
       "prior_citation": {
         "passage_id": "<passage id from the prior version>",
-        "start_offset": <int>,
-        "end_offset": <int>,
-        "verified": false,
-        "verification_rationale": "pending citation_verify stage"
+        "citing_span": "<verbatim text span from the cited prior passage>"
       },
       "new_citation": null,
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
@@ -90,9 +80,24 @@ Also valid when change_type="removed" — the whole new_citation object is null:
 }"""
 
 
+class LlmChange(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  change_id: str
+  tenant_id: str
+  environment: str
+  proceeding_id: str
+  change_type: Literal['added', 'removed', 'tightened', 'loosened', 'cosmetic']
+  description: str
+  prior_citation: LlmCitation | None
+  new_citation: LlmCitation | None
+  confidence: int
+  confidence_rationale: str
+  detected_at: datetime
+
+
 class VersionDiffResponse(BaseModel):
   model_config = ConfigDict(extra='forbid')
-  changes: tuple[Change, ...]
+  changes: tuple[LlmChange, ...]
 
 
 VERSION_DIFF_SPEC = CallSpec(
@@ -103,14 +108,18 @@ VERSION_DIFF_SPEC = CallSpec(
     'both versions.'
   ),
   acceptance_criteria=(
-    'Each returned Change: has a non-empty description; cites real passages '
-    'in prior/new (or null when the change is purely added or removed); '
+    'Each returned LlmChange: has a non-empty description; cites real '
+    'passages in prior/new (or null when the change is purely added or '
+    'removed); each citing_span is copied verbatim from the cited passage; '
     'change_type matches the semantic shift between the cited passages.'
   ),
   failure_modes=(
     '(a) Hallucinated passage_id not present in either version. '
     '(b) Over-mapping — treating paraphrases as material changes. '
-    '(c) Draft/final confusion — citing NOPR text as if it were the final rule.'
+    '(c) Draft/final confusion — citing NOPR text as if it were the final rule. '
+    '(d) citing_span not verbatim — paraphrasing or summarising the cited '
+    'passage instead of copying the exact substring (grounding will mark '
+    'the citation unverified).'
   ),
 )
 
@@ -133,6 +142,10 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       '- Attach prior_citation and new_citation; set one to null when the '
       'change is added-only or removed-only.\n'
       '- Pure rewording that preserves meaning is cosmetic, not material.\n'
+      '- citing_span is the VERBATIM text copied character-for-character '
+      "from the cited passage. Do NOT paraphrase, summarise, or truncate "
+      'mid-word. Do NOT count characters or emit numeric offsets — grounding '
+      'is done deterministically by Python after this call.\n'
       '- Report confidence as an integer 0-5 per the confidence rubric in '
       'Details; set confidence_rationale naming the rubric level and why.'
     ),
@@ -156,7 +169,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
   environment = prior.environment
   proceeding_id = prior.proceeding_id
   changes = (
-    Change(
+    LlmChange(
       change_id=f'{proceeding_id}:change-001',
       tenant_id=tenant_id,
       environment=environment,
@@ -166,8 +179,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Final Rule permits RTOs/ISOs to establish an aggregation minimum size up to '
         '100 kW; NOPR explicitly disallowed any minimum size.'
       ),
-      prior_citation=_stub_citation(prior, 1),
-      new_citation=_stub_citation(final, 1),
+      prior_citation=_stub_llm_citation(prior, 1),
+      new_citation=_stub_llm_citation(final, 1),
       confidence=4,
       confidence_rationale=(
         'Direct textual contrast between subsection (A) of NOPR and Final Rule — '
@@ -175,7 +188,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
       ),
       detected_at=now,
     ),
-    Change(
+    LlmChange(
       change_id=f'{proceeding_id}:change-002',
       tenant_id=tenant_id,
       environment=environment,
@@ -185,8 +198,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Final Rule requires aggregator registration at least 60 days before '
         'participation; NOPR had no lead-time requirement.'
       ),
-      prior_citation=_stub_citation(prior, 2),
-      new_citation=_stub_citation(final, 2),
+      prior_citation=_stub_llm_citation(prior, 2),
+      new_citation=_stub_llm_citation(final, 2),
       confidence=4,
       confidence_rationale=(
         'Subsection (B) adds the 60-day lead time in Final; stub-generated against '
@@ -194,7 +207,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
       ),
       detected_at=now,
     ),
-    Change(
+    LlmChange(
       change_id=f'{proceeding_id}:change-003',
       tenant_id=tenant_id,
       environment=environment,
@@ -205,7 +218,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'rated ≥100 kW; NOPR had no telemetry requirement.'
       ),
       prior_citation=None,
-      new_citation=_stub_citation(final, 3),
+      new_citation=_stub_llm_citation(final, 3),
       confidence=5,
       confidence_rationale=(
         'Final subsection (C) adds the telemetry obligation; stub-generated against '
@@ -217,7 +230,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
   return VersionDiffResponse(changes=changes)
 
 
-def detect_changes(prior: ProceedingVersion, final: ProceedingVersion) -> list[Change]:
+def detect_changes(prior: ProceedingVersion, final: ProceedingVersion) -> list[LlmChange]:
   if prior.proceeding_id != final.proceeding_id:
     raise ValueError(
       f'proceeding_id mismatch: prior={prior.proceeding_id} final={final.proceeding_id}'
@@ -244,14 +257,11 @@ def detect_changes(prior: ProceedingVersion, final: ProceedingVersion) -> list[C
   return list(response.changes)
 
 
-def _stub_citation(version: ProceedingVersion, position: int) -> Citation:
+def _stub_llm_citation(version: ProceedingVersion, position: int) -> LlmCitation:
   passage = _passage_at_position(version, position)
-  return Citation(
+  return LlmCitation(
     passage_id=passage.passage_id,
-    start_offset=0,
-    end_offset=min(len(passage.text), 200),
-    verified=False,
-    verification_rationale='pending citation_verify stage',
+    citing_span=passage.text[: min(len(passage.text), 200)],
   )
 
 

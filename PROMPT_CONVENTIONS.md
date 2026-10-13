@@ -235,6 +235,49 @@ Asking the model to emit a `matched_obligation_id: str` where the string is expe
 
 ---
 
+## 5.5 Never ask the LLM to emit character offsets or count characters
+
+Same spirit as §5 (don't ask the model to do indexing work), applied to character-level positions in text. If downstream code needs `start_offset: int` and `end_offset: int` into a passage, have the LLM emit the **verbatim substring** (`citing_span: str`) and let deterministic Python compute offsets with `passage.text.find(citing_span)`.
+
+### Why
+
+LLMs cannot count characters reliably. Asking the model to emit numeric offsets into a multi-hundred-character passage produces:
+- Plausible-looking but wrong offsets that drift by 1–10 characters.
+- Offsets that truncate the span mid-word.
+- Fabricated numbers that happen to land in the right ballpark but miss the actual supporting text.
+
+A verbatim-copy task is a strict superset of what the LLM can do reliably (quote from a passage), while leaving the error-prone arithmetic to Python's `str.find`. If the LLM paraphrases or summarises instead of copying verbatim, `str.find` returns -1 — a loud failure signal — rather than silently producing a wrong offset.
+
+### How to structure the prompt
+
+1. In the response model, use a dedicated LLM-side type with the string field:
+   ```python
+   class LlmCitation(BaseModel):
+     model_config = ConfigDict(extra='forbid')
+     passage_id: str
+     citing_span: str   # verbatim; grounding computes offsets
+   ```
+
+2. In `rubrics` or `pitfalls`, tell the model explicitly:
+   > `citing_span` is the VERBATIM text copied character-for-character from the cited passage. Do NOT paraphrase, summarise, or truncate mid-word. Do NOT count characters or emit numeric offsets — grounding is done deterministically by Python after this call.
+
+3. In the deterministic grounding step, run `start = passage.text.find(citing_span)`. If `start < 0` or `len(citing_span) < min_citation_span_chars`, mark the citation unverified with a specific rationale. If match, compute `end = start + len(citing_span)`.
+
+4. Keep the persisted / domain `Citation` type with real `start_offset: int` / `end_offset: int` — those are correct downstream; grounding is just the bridge from LLM-shape to domain-shape.
+
+### Anti-pattern
+
+Asking the model to emit `"start_offset": <int>, "end_offset": <int>` directly on a `Citation` field. Even with the passage text in context, the model will produce offsets that look reasonable but are off by a few characters, point to the wrong word boundary, or fabricate wholesale. This is a real correctness bug — the Strata build had this pattern earlier and regressed; see commit history for the fix. For every claim-with-source pattern (citation grounding, obligation extraction, change detection, excerpt highlighting), use `citing_span: str` + deterministic `find`.
+
+### When this applies
+
+- Citation grounding: LLM says "this passage supports the claim"; LLM emits `citing_span`, grounding finds offsets.
+- Obligation extraction: LLM extracts an obligation whose text lives inside a passage; same pattern.
+- Change detection: LLM identifies the text span that changed between versions; same pattern.
+- Any extraction task where the LLM output must point to a precise span inside an input text — never offsets, always verbatim-span-plus-deterministic-find.
+
+---
+
 ## 6. Pydantic response model conventions
 
 ```python

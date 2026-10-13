@@ -483,18 +483,27 @@ the source `Passage` that supports the claim. This is the core trust
 property of the product.
 
 **v1.**
-- The LLM task that produces `Change`s (§3.2) also returns, for each
-  change, the `passage_id` (as a 0-based integer index into the
-  enumerated list of passages in the prompt — per PROMPT_CONVENTIONS.md
-  §5) plus a `citing_span: str` containing the verbatim text span the
-  LLM claims supports the change.
-- Post-generation, `src/citation/citation_grounding.py` resolves the
-  integer index → `passage_id` string, then computes `start_offset` /
-  `end_offset` by substring-matching `citing_span` within the
-  `Passage.text`.
-- If no match: `Citation.verified` starts `False` and
-  `verification_rationale` records "citing span not found in cited
-  passage." This is a loud, auditable failure, not a silent one.
+- The LLM task that produces changes (§3.2) returns an `LlmChange`
+  per detected change. Each `LlmChange.prior_citation` /
+  `LlmChange.new_citation` is an `LlmCitation` with two fields:
+  `passage_id: str` (the full structural ID of the cited passage)
+  and `citing_span: str` (the verbatim text copied character-for-
+  character from the cited passage).
+- Post-generation, `src/citation/citation_grounding.py` runs a
+  deterministic substring match: `start_offset =
+  passage.text.find(citing_span)`, `end_offset = start_offset +
+  len(citing_span)`. The resulting `Citation` has real offsets and
+  starts `verified=False` pending the citation_verify stage.
+- Three auditable failure paths, all `verified=False` with a
+  specific rationale:
+  - Unknown passage_id → raises `ValueError` (hard fail — the LLM
+    cited a passage the pipeline doesn't know about).
+  - `len(citing_span) < citation.min_citation_span_chars` → rationale
+    "`span width <N> below citation.min_citation_span_chars=<M>`".
+    Routes to escalation via citation_threshold at the review-queue
+    gate (§3.7).
+  - Substring not found in cited passage → rationale "`citing span
+    not found in cited passage`". Routes to escalation the same way.
 
 **Production.**
 - Full-text indexing with structural anchors stable across versions.
@@ -515,10 +524,20 @@ property of the product.
 - **Offsets, not just passage IDs.** A passage is often 50–200 words;
   offsets let the verifier and the UI highlight the specific supporting
   span.
-- **LLM emits integer index, not the passage ID string.** LLMs truncate
-  / transpose / hallucinate long opaque IDs. Short integer indexes into
-  a short list are impossible to confuse (PROMPT_CONVENTIONS.md §5). The
-  caller translates the index back to `passage_id`.
+- **LLM emits `citing_span: str`, deterministic code computes offsets.**
+  LLMs cannot count characters reliably — asking the model to emit
+  `start_offset: int` / `end_offset: int` produces plausible but
+  wrong numbers (drift by a few characters, truncate mid-word, or
+  fabricate values that look right). Instead we have the LLM copy
+  the verbatim text span, and `passage.text.find(citing_span)` in
+  Python computes the offsets. If the span isn't literally present
+  in the passage (paraphrase, summary, hallucination) the match
+  returns -1 and the citation is marked unverified with the
+  "citing span not found" rationale — a loud auditable failure
+  rather than a silent wrong offset. This mirrors the integer-index
+  pattern used for list picks in §3.6 Mapping; both are instances
+  of PROMPT_CONVENTIONS.md's "never ask the LLM to count or index"
+  rule.
 - **Why not hash-anchoring (storing a hash of the passage text as the
   anchor)?** Hashes change under any edit, including whitespace or
   renumbering. Structural anchors survive.

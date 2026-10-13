@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from src.audit_log import log_event
-from src.citation.citation_grounding import ground_citations
+from src.citation.citation_grounding import ground_citations_for_changes, ground_obligations
 from src.citation.citation_verify import verify_citations
 from src.config import (
   Change,
@@ -75,8 +75,8 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
   final = next(v for v in versions if v.status == 'final')
 
   logger.info('diff.start', prior=nopr.version_id, final=final.version_id)
-  changes = detect_changes(nopr, final)
-  changes = ground_citations(changes, nopr, final)
+  llm_changes = detect_changes(nopr, final)
+  changes = ground_citations_for_changes(llm_changes, nopr, final)
   if result.config.citation.verification_required:
     changes = verify_citations(changes, nopr, final)
   else:
@@ -98,7 +98,8 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
   logger.info('extract.start')
   extracted: list[ExtractedObligation] = []
   for v in versions:
-    extracted.extend(extract_obligations(v))
+    llm_extracted = extract_obligations(v)
+    extracted.extend(ground_obligations(llm_extracted, v))
   result.extracted = extracted
   if not dry_run:
     extracted_obligation_store.save_all(tenant_id, environment, extracted)

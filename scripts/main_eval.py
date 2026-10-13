@@ -5,7 +5,7 @@ from pathlib import Path
 import orjson
 from absl import app, flags
 
-from src.citation.citation_grounding import ground_citations
+from src.citation.citation_grounding import ground_citations_for_changes, ground_obligations
 from src.citation.citation_verify import verify_citations
 from src.evals import (
   GoldCase,
@@ -61,8 +61,8 @@ def _run() -> None:
     logger.info('eval.case.start', case_id=case.case_id)
     prior = _build_version(case, 'prior')
     final = _build_version(case, 'new')
-    predicted_changes = detect_changes(prior, final)
-    predicted_changes = ground_citations(predicted_changes, prior, final)
+    predicted_llm_changes = detect_changes(prior, final)
+    predicted_changes = ground_citations_for_changes(predicted_llm_changes, prior, final)
     predicted_changes = verify_citations(predicted_changes, prior, final)
     result = evaluate_case(case.expected_changes, predicted_changes)
     result.case_id = case.case_id
@@ -72,7 +72,9 @@ def _run() -> None:
 
     predicted_extractions = []
     if case.expected_extractions is not None:
-      predicted_extractions = list(extract_obligations(prior)) + list(extract_obligations(final))
+      predicted_extractions = list(ground_obligations(extract_obligations(prior), prior)) + list(
+        ground_obligations(extract_obligations(final), final)
+      )
       score_extractions(result, case.expected_extractions, predicted_extractions)
 
     predicted_mappings = []

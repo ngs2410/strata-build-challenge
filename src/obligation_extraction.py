@@ -1,6 +1,9 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
-from src.config import Citation, ExtractedObligation, ProceedingVersion
+from src.citation.llm_citation import LlmCitation
+from src.config import ProceedingVersion
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
 from src.prompt_calibration import CONFIDENCE_LEVEL_RUBRIC, OBLIGATION_TAXONOMY_REFERENCE
@@ -20,10 +23,7 @@ OBLIGATION_EXTRACTION_JSON_EXAMPLE = """{
       "full_text": "<verbatim obligation text from the passage>",
       "citation": {
         "passage_id": "<passage id that establishes this obligation>",
-        "start_offset": <int>,
-        "end_offset": <int>,
-        "verified": false,
-        "verification_rationale": "pending citation_verify stage"
+        "citing_span": "<verbatim text span copied character-for-character from the cited passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
       "confidence_rationale": "<which rubric level you picked and why>"
@@ -37,25 +37,45 @@ STUB_RATIONALE = (
 )
 
 
+class LlmExtractedObligation(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  extraction_id: str
+  tenant_id: str
+  environment: str
+  proceeding_id: str
+  version_id: str
+  obligation_type: Literal['reporting', 'operational', 'procedural', 'financial']
+  summary: str
+  full_text: str
+  citation: LlmCitation
+  confidence: int
+  confidence_rationale: str
+
+
 class ObligationExtractionResponse(BaseModel):
   model_config = ConfigDict(extra='forbid')
-  extracted_obligations: tuple[ExtractedObligation, ...]
+  extracted_obligations: tuple[LlmExtractedObligation, ...]
 
 
 OBLIGATION_EXTRACTION_SPEC = CallSpec(
   purpose=(
     'From a proceeding version, extract each regulatory obligation it '
-    'establishes. Attach a structural citation to the supporting passage.'
+    'establishes. Attach a structural citation (passage_id + citing_span) '
+    'that grounding will substring-match into offsets.'
   ),
   acceptance_criteria=(
-    'Every ExtractedObligation has a non-null citation, a valid '
-    'obligation_type (reporting / operational / procedural / financial), and '
-    'a confidence score with a rubric-grounded rationale.'
+    'Every LlmExtractedObligation has a non-null citation whose citing_span '
+    'is copied verbatim from the cited passage, a valid obligation_type '
+    '(reporting / operational / procedural / financial), and a confidence '
+    'score with a rubric-grounded rationale.'
   ),
   failure_modes=(
     '(a) Mis-typing — classifying a procedural obligation as reporting. '
     '(b) Over-extraction — splitting one obligation into several. '
-    '(c) Missing citation — producing an obligation without passage anchor.'
+    '(c) Missing citation — producing an obligation without passage anchor. '
+    '(d) citing_span not verbatim — paraphrasing or summarising the cited '
+    'passage instead of copying the exact substring (grounding will mark '
+    'the citation unverified).'
   ),
 )
 
@@ -71,10 +91,15 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
     task='Extract every discrete obligation from the passage below.',
     details=OBLIGATION_TAXONOMY_REFERENCE + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
-      '- One ExtractedObligation per discrete obligation.\n'
+      '- One LlmExtractedObligation per discrete obligation.\n'
       '- obligation_type is one of reporting / operational / procedural / '
       'financial per the taxonomy in Details.\n'
-      '- Each obligation carries a structural citation (passage_id + offsets).\n'
+      '- Each obligation carries a structural citation: passage_id + '
+      'citing_span. citing_span is the VERBATIM text copied '
+      'character-for-character from the cited passage. Do NOT paraphrase, '
+      'summarise, or truncate mid-word. Do NOT count characters or emit '
+      'numeric offsets — grounding is done deterministically by Python '
+      'after this call.\n'
       '- Report confidence as an integer 0-5 per the confidence rubric in '
       'Details; set confidence_rationale naming the rubric level and why.'
     ),
@@ -90,16 +115,13 @@ def stub_obligation_extraction_response(params: dict) -> ObligationExtractionRes
   if not version.passages:
     return ObligationExtractionResponse(extracted_obligations=())
   anchor = version.passages[0]
-  citation = Citation(
+  citation = LlmCitation(
     passage_id=anchor.passage_id,
-    start_offset=0,
-    end_offset=min(len(anchor.text), 200),
-    verified=True,
-    verification_rationale='stub extraction attaches a pre-verified citation',
+    citing_span=anchor.text[: min(len(anchor.text), 200)],
   )
   return ObligationExtractionResponse(
     extracted_obligations=(
-      ExtractedObligation(
+      LlmExtractedObligation(
         extraction_id=f'{version.proceeding_id}:{version.version_id}:ext-001',
         tenant_id=version.tenant_id,
         environment=version.environment,
@@ -116,7 +138,7 @@ def stub_obligation_extraction_response(params: dict) -> ObligationExtractionRes
   )
 
 
-def extract_obligations(version: ProceedingVersion) -> list[ExtractedObligation]:
+def extract_obligations(version: ProceedingVersion) -> list[LlmExtractedObligation]:
   prompt = build_obligation_extraction_prompt(version)
   system, user = prompt.render()
   response = model_caller.call(

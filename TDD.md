@@ -97,17 +97,19 @@ shape Jev is architected for.
 **Key properties, each enforced by code elsewhere in this document:**
 
 1. Every claim carries a structural citation (`passage_id` + offsets).
-   Enforced in §3.3; verified in §3.4; measured in §5.
+   Enforced in [§3.3](#33-citation-grounding-depth-area); verified in
+   [§3.4](#34-citation-verification-depth-area); measured in
+   [§5](#5-evals-depth-area).
 2. Low-confidence interpretations escalate to a human reviewer — the
    system fails to a reviewer, not to a guess. Enforced at the
-   review-queue gate (§3.7); threshold is a `DomainConfig` hyperparameter
-   (§4.3).
+   review-queue gate ([§3.7](#37-review--audit)); threshold is a
+   `DomainConfig` hyperparameter ([§4.3](#43-configuration)).
 3. Project state is a fold over an append-only audit log. Enforced in
-   §3.7; rollback is replay-to-timestamp.
+   [§3.7](#37-review--audit); rollback is replay-to-timestamp.
 4. Draft vs. final is a first-class attribute on every proceeding version
-   (`Literal['draft', 'final']`). Enforced in §2.
+   (`Literal['draft', 'final']`). Enforced in [§2](#2-data-model).
 5. Data isolation is per `(tenant_id, environment)`. Every facade method
-   takes these as leading parameters (§4.5).
+   takes these as leading parameters ([§4.5](#45-data-isolation--multi-tenancy)).
 
 **Depth areas** — components where the v1 implementation is more
 thoroughly executed:
@@ -117,9 +119,10 @@ thoroughly executed:
   reproducing cases, reliability diagram for confidence calibration,
   metrics report produced on every end-to-end run.
 
-Both map directly to the PRD's trust metrics (citation precision ≥ 98%;
-mapping precision ≥ 90%; confidence calibration ≥ 95% on high-confidence
-claims). The trust story falls over if either is weak.
+Both map directly to the [PRD's trust metrics](PRD.md#4-trust-and-adoption-metrics-for-expert-users)
+(citation precision ≥ 98%; mapping precision ≥ 90%; confidence
+calibration ≥ 95% on high-confidence claims). The trust story falls
+over if either is weak.
 
 ---
 
@@ -325,8 +328,9 @@ _Source: persisted `Mapping` [`src/config.py` L120-L133](https://github.com/ngs2
   modeling claim.** Real regulatory changes often touch multiple teams
   in parallel. v1 captures only the primary team; the expansion to
   `routing_destinations: tuple[Literal[...], ...]` (primary + CC, or
-  parallel) is tracked as open question §8.6 along with the
-  workflow-engine questions it opens.
+  parallel) is tracked as open question [§8.6](#86-multi-reviewer-routing)
+  along with the workflow-engine questions it opens, and matches
+  [PRD §7 bullet 6](PRD.md#7-open-questions-and-unvalidated-assumptions).
 - **`recommended_action` is a `Literal` of three values.** Alternatives:
   open-ended free text (unverifiable; forces Rachel to interpret every
   action), per-action-type structured outputs (over-engineered). Three
@@ -685,8 +689,9 @@ _Source: [`src/obligation_extraction.py`](https://github.com/ngs2410/strata-buil
 **Role.** Given a verified `Change` (with citation), determine which
 Verdant obligations, projects, and documents it affects, recommend an
 action per affected item, and route the overall item to its primary
-internal destination (one of three in v1 — see §8.6 for the
-multi-reviewer open question).
+internal destination (one of three in v1 — see [§8.6](#86-multi-reviewer-routing)
+for the multi-reviewer open question; mirrored at
+[PRD §7 bullet 6](PRD.md#7-open-questions-and-unvalidated-assumptions)).
 
 _Source: [`src/mapping.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py) — `AffectedItemByIndex` [L43-L48](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L43-L48), `MappingResponse` [L51-L58](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L51-L58), `build_mapping_prompt` [L83](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L83), `map_change` [L203](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L203), `_resolve_affected_item` (index→id translation) [L249](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L249)._
 
@@ -1325,18 +1330,18 @@ _Source: [`scripts/main_eval.py`](https://github.com/ngs2410/strata-build-challe
 
 PREP_MATERIAL.md calls out two kinds of technical spike reviewers look
 for; empirical validation is one of them. Without the eval harness,
-every trust metric in PRD §4 is aspirational. With it, we can defend the
-trust story in the panel interview with real numbers against a specific
-gold set.
+every trust metric in [PRD §4](PRD.md#4-trust-and-adoption-metrics-for-expert-users)
+is aspirational. With it, we can defend the trust story in the panel
+interview with real numbers against a specific gold set.
 
 The eval harness is where every open technical question becomes
 concrete:
-- Confidence calibration (open-q #1) — the reliability diagram *is* the
-  measurement.
-- Mapping threshold (open-q #3) — the harness tells us where to set it
-  empirically.
-- Material-change taxonomy (open-q #5) — the confusion matrix on
-  `change_type` tells us where it's underspecified.
+- Confidence calibration ([§8.1](#81-confidence-calibration-beyond-self-report)) —
+  the reliability diagram *is* the measurement.
+- Mapping threshold ([§8.3](#83-mapping-confidence-threshold)) — the
+  harness tells us where to set it empirically.
+- Material-change taxonomy ([§8.5](#85-material-change-taxonomy-stability)) —
+  the confusion matrix on `change_type` tells us where it's underspecified.
 - Jev migration (future) — A/B-measurable on this harness.
 
 ---
@@ -1383,7 +1388,8 @@ exposes `--host`, `--port`, `--reload`.
 
 ### 6.2 Web View
 
-**Role.** Rachel's surface. Two routes, two templates.
+**Role.** [Rachel](PRD.md#1-the-user)'s surface. Two routes, two
+templates.
 
 _Source: FastAPI app in [`src/web_app.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py) (`queue` [L29](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L29), `audit` [L57](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L57), `post_action` [L72](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L72)); templates [`templates/queue.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/queue.html) + [`templates/audit.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/audit.html)._
 
@@ -1468,6 +1474,8 @@ Decisions consciously deferred, each with a lean and a next-move trigger.
 
 ### 8.1 Confidence calibration beyond self-report
 
+_Mirrors [PRD §7 bullet "Confidence-threshold calibration"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
+
 **State.** v1 uses LLM-self-reported `confidence: int (0-5)` with a
 rubric in the prompt and a required `confidence_rationale`. Reliability
 measured against gold via the eval harness.
@@ -1513,6 +1521,8 @@ errors we can't fix with prompt tweaks.
 
 ### 8.3 Mapping confidence threshold
 
+_Mirrors [PRD §7 bullet "≥ 90% mapping-precision target"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
+
 **State.** Default 3 (on 0–5 scale) in
 `DomainConfig.escalation.mapping_threshold`. Per-tenant tunable.
 
@@ -1526,6 +1536,8 @@ Rachel's simulated accept rate) hits 80%.
 set.
 
 ### 8.4 Gold set drift and growth
+
+_Mirrors [PRD §7 bullet "Synthetic company context fidelity"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
 
 **State.** v1 ships 30 hand-labelled items. Rachel's overrides are
 logged but not auto-promoted.
@@ -1541,6 +1553,8 @@ regression caught on next CI run.
 
 ### 8.5 Material-change taxonomy stability
 
+_Mirrors [PRD §7 bullet "Material change is operator-defined"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
+
 **State.** v1 ships closed Literal of five values (added / removed /
 tightened / loosened / cosmetic).
 
@@ -1554,6 +1568,8 @@ adjustments.
 **Trigger.** First week of real reviewer use.
 
 ### 8.6 Multi-reviewer routing
+
+_Mirrors [PRD §7 bullet "Routing is single-destination in v1"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
 
 **State.** v1 routes each change to a single *primary* destination by
 design — the schema (`Mapping.routing_destination` in `src/config.py`),

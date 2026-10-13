@@ -11,6 +11,7 @@ from src.evals import (
   aggregate,
   evaluate_case,
   load_gold,
+  render_markdown_report,
   render_text_report,
   score_extractions,
   score_mappings,
@@ -508,3 +509,26 @@ def test_load_gold_parses_extended_fields():
   assert case.expected_mappings is not None
   assert len(case.expected_mappings) == 3
   assert case.company_context_tenant == 'verdant_grid'
+
+
+def test_render_markdown_report_includes_headline_table_and_text_body():
+  change = _change('c-1', 'loosened', 1, 1)
+  expected_changes = (_expected('loosened', 1, 1),)
+  result = evaluate_case(expected_changes, [change])
+  result.case_id = 'case-1'
+  agg = aggregate([result])
+  md = render_markdown_report(
+    agg,
+    [result],
+    tenant_id='verdant_grid',
+    environment='prod',
+    gold_file='data/evals/gold.json',
+    generated_at_iso='2026-10-13T00:00:00+00:00',
+  )
+  assert md.startswith('# Strata eval results — 2026-10-13T00:00:00+00:00')
+  assert '## Headline numbers' in md
+  assert '| change_detection      | precision             |' in md
+  assert '| mapping               | route_accuracy        |' in md
+  assert '## Full text report' in md
+  assert '```' in md
+  assert 'Cases run: 1' in md

@@ -544,5 +544,50 @@ def render_text_report(report: dict, results: list[CaseResult]) -> str:
   return '\n'.join(lines)
 
 
+def render_markdown_report(
+  report: dict,
+  results: list[CaseResult],
+  *,
+  tenant_id: str,
+  environment: str,
+  gold_file: str,
+  generated_at_iso: str,
+) -> str:
+  text_body = render_text_report(report, results)
+  cd = report['change_detection']
+  cv = report['citation_verify']
+  oe = report['obligation_extraction']
+  mp = report['mapping']
+  rows = [
+    ('change_detection', 'precision', cd['precision']),
+    ('change_detection', 'recall', cd['recall']),
+    ('change_detection', 'f1', cd['f1']),
+    ('change_detection', 'citation_precision', cd['citation_precision']),
+    ('citation_verify', 'verification_accuracy', cv['verification_accuracy']),
+    ('obligation_extraction', 'f1', oe['f1']),
+    ('obligation_extraction', 'type_accuracy', oe['obligation_type_accuracy']),
+    ('mapping', 'item_f1', mp['item_f1']),
+    ('mapping', 'action_accuracy', mp['action_accuracy']),
+    ('mapping', 'route_accuracy', mp['route_accuracy']),
+  ]
+  lines = [
+    f'# Strata eval results — {generated_at_iso}',
+    '',
+    f'- **Tenant:** `{tenant_id}`',
+    f'- **Environment:** `{environment}`',
+    f'- **Gold file:** `{gold_file}`',
+    f'- **Cases run:** {report["cases_run"]}',
+    '',
+    '## Headline numbers',
+    '',
+    '| Stage                 | Metric                | Value |',
+    '|-----------------------|-----------------------|-------|',
+  ]
+  for stage, metric, value in rows:
+    lines.append(f'| {stage:<21} | {metric:<21} | {value:.3f} |')
+  lines.extend(['', '## Full text report', '', '```', text_body, '```', ''])
+  return '\n'.join(lines)
+
+
 def _fmt(value: float | None) -> str:
   return 'n/a' if value is None else f'{value:.3f}'

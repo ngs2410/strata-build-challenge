@@ -12,6 +12,7 @@ from src.evals import (
   aggregate,
   evaluate_case,
   load_gold,
+  render_markdown_report,
   render_text_report,
   score_extractions,
   score_mappings,
@@ -30,6 +31,12 @@ flags.DEFINE_string('tenant_id', 'verdant_grid', 'Tenant identifier')
 flags.DEFINE_string('environment', 'prod', 'Environment (prod/staging/dev)')
 flags.DEFINE_string('gold_file', 'data/evals/gold.json', 'Path to gold-set JSON')
 flags.DEFINE_string('output_dir', 'output/evals', 'Directory for JSON report output')
+flags.DEFINE_string(
+  'md_output',
+  '',
+  'If set, also write a human-readable markdown report at this path. Intended '
+  'for committed submission artifacts (see Makefile target eval-report).',
+)
 flags.DEFINE_boolean('dry_run', False, 'Compute metrics but do not write report to disk')
 flags.DEFINE_integer('k', None, 'Smoke-test: run only first K gold cases')
 flags.DEFINE_boolean('profile', False, 'Run under cProfile; log top 50 functions')
@@ -112,6 +119,20 @@ def _run() -> None:
       orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_NON_STR_KEYS)
     )
     logger.info('eval.report_written', path=str(output_path))
+
+    if FLAGS.md_output:
+      md_path = Path(FLAGS.md_output)
+      md_path.parent.mkdir(parents=True, exist_ok=True)
+      md_body = render_markdown_report(
+        report,
+        case_results,
+        tenant_id=FLAGS.tenant_id,
+        environment=FLAGS.environment,
+        gold_file=FLAGS.gold_file,
+        generated_at_iso=datetime.now(timezone.utc).isoformat(timespec='seconds'),
+      )
+      md_path.write_text(md_body)
+      logger.info('eval.markdown_report_written', path=str(md_path))
 
 
 def _build_version(case: GoldCase, which: str):

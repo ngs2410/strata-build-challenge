@@ -5,14 +5,21 @@ from pathlib import Path
 import orjson
 from absl import app, flags
 
+from src.citation.citation_grounding import ground_citations
+from src.citation.citation_verify import verify_citations
 from src.evals import (
   GoldCase,
   aggregate,
   evaluate_case,
   load_gold,
   render_text_report,
+  score_extractions,
+  score_mappings,
+  score_verifications,
 )
-from src.ingest import ingest_proceeding_version
+from src.ingest import ingest_company_context, ingest_proceeding_version
+from src.mapping import map_change
+from src.obligation_extraction import extract_obligations
 from src.telemetry import configure_logging, get_logger
 from src.version_diff import detect_changes
 
@@ -39,16 +46,40 @@ def _run() -> None:
     logger.info('eval.case.start', case_id=case.case_id)
     prior = _build_version(case, 'prior')
     final = _build_version(case, 'new')
-    predicted = detect_changes(prior, final)
-    result = evaluate_case(case.expected_changes, predicted)
+    predicted_changes = detect_changes(prior, final)
+    predicted_changes = ground_citations(predicted_changes, prior, final)
+    predicted_changes = verify_citations(predicted_changes, prior, final)
+    result = evaluate_case(case.expected_changes, predicted_changes)
     result.case_id = case.case_id
+
+    if case.expected_verifications is not None:
+      score_verifications(result, case.expected_verifications, predicted_changes)
+
+    predicted_extractions = []
+    if case.expected_extractions is not None:
+      predicted_extractions = list(extract_obligations(prior)) + list(extract_obligations(final))
+      score_extractions(result, case.expected_extractions, predicted_extractions)
+
+    predicted_mappings = []
+    if case.expected_mappings is not None:
+      tenant_for_context = case.company_context_tenant or FLAGS.tenant_id
+      obligations, projects, documents = ingest_company_context(
+        tenant_for_context, FLAGS.environment
+      )
+      predicted_mappings = [
+        map_change(change, obligations, projects, documents) for change in predicted_changes
+      ]
+      score_mappings(result, case.expected_mappings, predicted_changes, predicted_mappings)
+
     logger.info(
       'eval.case.done',
       case_id=case.case_id,
-      tp=result.true_positives,
-      fp=result.false_positives,
-      fn=result.false_negatives,
-      citation_hits=result.citation_hits,
+      diff_tp=result.true_positives,
+      diff_fp=result.false_positives,
+      diff_fn=result.false_negatives,
+      verification_correct=f'{result.verification_correct}/{result.verification_total}',
+      extraction_tp=result.extraction_tp,
+      mapping_item_tp=result.mapping_item_tp,
     )
     case_results.append(result)
 
@@ -114,5 +145,9 @@ def main(argv):
   _run()
 
 
-if __name__ == '__main__':
+def main_entry():
   app.run(main)
+
+
+if __name__ == '__main__':
+  main_entry()

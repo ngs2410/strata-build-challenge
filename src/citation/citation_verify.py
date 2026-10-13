@@ -75,9 +75,7 @@ def build_citation_verify_prompt(
       '- Rationale should quote the specific supporting phrase.'
     ),
     inputs_dict={
-      'claim': (
-        '--- start of changes ---\n' + rendered_changes + '\n--- end of changes ---'
-      ),
+      'claim': ('--- start of changes ---\n' + rendered_changes + '\n--- end of changes ---'),
     },
   )
 
@@ -131,9 +129,7 @@ def verify_citations(
   for change in changes:
     verification = by_change_id.get(change.change_id)
     if verification is None:
-      raise ValueError(
-        f'citation_verify returned no verification for change_id={change.change_id}'
-      )
+      raise ValueError(f'citation_verify returned no verification for change_id={change.change_id}')
     merged.append(
       change.model_copy(
         update={
@@ -202,9 +198,7 @@ def _apply_verification(
   )
 
 
-def _stub_verify(
-  citation: Citation | None, passages_by_id: dict
-) -> tuple[bool | None, str | None]:
+def _stub_verify(citation: Citation | None, passages_by_id: dict) -> tuple[bool | None, str | None]:
   if citation is None:
     return None, None
   if citation.passage_id not in passages_by_id:

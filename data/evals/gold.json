@@ -29,7 +29,83 @@
           "new_passage_position": 3,
           "description_keywords": ["telemetry"]
         }
-      ]
+      ],
+      "expected_verifications": [
+        {
+          "change_match": ["loosened", 1, 1],
+          "prior_verified": true,
+          "new_verified": true
+        },
+        {
+          "change_match": ["tightened", 2, 2],
+          "prior_verified": true,
+          "new_verified": true
+        },
+        {
+          "change_match": ["added", null, 3],
+          "prior_verified": null,
+          "new_verified": true
+        }
+      ],
+      "expected_extractions": [
+        {
+          "version_id": "nopr-2019-11",
+          "obligation_type": "procedural",
+          "passage_position": 1,
+          "description_keywords": ["minimum", "size"]
+        },
+        {
+          "version_id": "nopr-2019-11",
+          "obligation_type": "procedural",
+          "passage_position": 2,
+          "description_keywords": ["register"]
+        },
+        {
+          "version_id": "final-2020-09",
+          "obligation_type": "procedural",
+          "passage_position": 1,
+          "description_keywords": ["100", "kW"]
+        },
+        {
+          "version_id": "final-2020-09",
+          "obligation_type": "procedural",
+          "passage_position": 2,
+          "description_keywords": ["60 days"]
+        },
+        {
+          "version_id": "final-2020-09",
+          "obligation_type": "operational",
+          "passage_position": 3,
+          "description_keywords": ["telemetry"]
+        }
+      ],
+      "expected_mappings": [
+        {
+          "change_match": ["loosened", 1, 1],
+          "affected_obligation_ids": ["VG-OBL-DER-SIZE-01"],
+          "affected_project_ids": [],
+          "affected_document_ids": ["VG-DOC-TARIFF-FILING-2026Q4"],
+          "recommended_action": "review",
+          "routing_destination": "legal"
+        },
+        {
+          "change_match": ["tightened", 2, 2],
+          "affected_obligation_ids": ["VG-OBL-DER-REG-01"],
+          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1"],
+          "affected_document_ids": ["VG-DOC-DER-OPS-PROC-v3.2"],
+          "recommended_action": "amend",
+          "routing_destination": "market_ops"
+        },
+        {
+          "change_match": ["added", null, 3],
+          "affected_obligation_ids": ["VG-OBL-DER-TEL-01"],
+          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1", "VG-PRJ-AMI-TELEMETRY-UPGRADE"],
+          "affected_document_ids": ["VG-DOC-DER-OPS-PROC-v3.2"],
+          "recommended_action": "amend",
+          "routing_destination": "it_metering"
+        }
+      ],
+      "company_context_tenant": "verdant_grid"
     }
   ]
 }

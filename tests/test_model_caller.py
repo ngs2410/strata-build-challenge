@@ -189,6 +189,11 @@ def test_confirm_llm_prompts_and_proceeds_on_blank_input(
   # Real newline, not escaped — multi-line content must span lines in stdout.
   assert 'user-content-marker\nsecond-line' in stdout
   assert "\\n" not in stdout.split('[model_caller] prompt:')[1].split('-' * 70)[0]
+  # After dispatch the parsed response is pretty-printed as indented JSON so
+  # the operator can eyeball the model's output on each confirm step.
+  assert '[model_caller] task=version_diff response (VersionDiffResponse):' in stdout
+  assert '"changes":' in stdout  # the top-level field of VersionDiffResponse
+  assert '"change_type":' in stdout  # a per-change field
 
 
 def test_confirm_llm_prompts_and_proceeds_on_lowercase_y(

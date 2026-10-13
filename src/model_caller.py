@@ -119,6 +119,8 @@ class ModelCaller:
     if self._confirm_llm:
       self._prompt_user(task_name, task_config, params)
     parsed = backend.call(task_name, task_config, params, response_type, call_spec)
+    if self._confirm_llm:
+      self._print_response(task_name, parsed)
     self._cache.set(cache_key_json, parsed.model_dump_json())
     self._log.info(
       'model_caller.call',
@@ -166,6 +168,12 @@ class ModelCaller:
     answer = input('[model_caller] Proceed? (y/n): ').strip().lower()
     if answer != 'y' and answer != '':
       raise RuntimeError(f'operator declined {task_name} at --confirm_llm prompt')
+
+  def _print_response(self, task_name: str, parsed: BaseModel) -> None:
+    print(f'\n{"-" * 70}')
+    print(f'[model_caller] task={task_name} response ({type(parsed).__name__}):')
+    print(parsed.model_dump_json(indent=2))
+    print(f'{"-" * 70}')
 
 
 model_caller = ModelCaller()

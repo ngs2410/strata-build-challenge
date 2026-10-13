@@ -22,7 +22,8 @@ MAPPING_SPEC = CallSpec(
   purpose=(
     "For a given Change, identify which of Verdant's obligations, projects, "
     'and documents it affects; recommend a per-item action; route the '
-    'overall change to one of three internal destinations.'
+    'overall change to its PRIMARY internal destination (one of three in v1 '
+    '— multi-destination routing is a known v2 extension; see TDD §8.6).'
   ),
   acceptance_criteria=(
     'Mapping has at least one AffectedItem OR a rationale explaining why no '
@@ -31,8 +32,9 @@ MAPPING_SPEC = CallSpec(
   ),
   failure_modes=(
     '(a) Over-mapping — flagging unrelated obligations as affected. '
-    '(b) Routing fan-out — routing a change that touches multiple teams to '
-    'only one. '
+    '(b) Primary-destination miscall — picking the wrong primary team among '
+    'market_ops / legal / it_metering when the change clearly belongs to a '
+    'different one. '
     '(c) ID hallucination — picking an obligation_id not in the candidate list.'
   ),
 )
@@ -73,7 +75,9 @@ def build_mapping_prompt(
     rubrics=(
       '- affected_items references items by their id (not list index).\n'
       '- recommended_action is one of review / amend / no_op.\n'
-      '- routing_destination is one of market_ops / legal / it_metering.'
+      '- routing_destination is one of market_ops / legal / it_metering.\n'
+      '  Pick the single PRIMARY team accountable for the change. '
+      'Secondary teams are not modelled in v1 (TDD §8.6).'
     ),
     inputs_dict={
       'change_description': change_summary,

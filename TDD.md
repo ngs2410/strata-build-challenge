@@ -304,6 +304,12 @@ class AffectedItem(BaseModel):
   from the overall `confidence`.
 - **`routing_destination` as `Literal`, not free text.** v1 ships three
   destinations; prod makes this configurable per-tenant.
+- **Single `routing_destination` per Change — a v1 scope choice, not a
+  modeling claim.** Real regulatory changes often touch multiple teams
+  in parallel. v1 captures only the primary team; the expansion to
+  `routing_destinations: tuple[Literal[...], ...]` (primary + CC, or
+  parallel) is tracked as open question §8.6 along with the
+  workflow-engine questions it opens.
 - **`recommended_action` is a `Literal` of three values.** Alternatives:
   open-ended free text (unverifiable; forces Rachel to interpret every
   action), per-action-type structured outputs (over-engineered). Three
@@ -612,8 +618,9 @@ confidence score (per the shared rubric).
 
 **Role.** Given a verified `Change` (with citation), determine which
 Verdant obligations, projects, and documents it affects, recommend an
-action per affected item, and route the overall item to one of three
-internal destinations.
+action per affected item, and route the overall item to its primary
+internal destination (one of three in v1 — see §8.6 for the
+multi-reviewer open question).
 
 **v1.**
 - `src/mapping.py` runs **one LLM call** that sees:
@@ -674,6 +681,10 @@ different scaling pressure. Not mutually exclusive; they combine.
 - **`routing_destination` as `Literal`.** v1 ships three destinations
   matching Verdant's teams; pluggable per-tenant via `DomainConfig` in
   prod.
+- **Single destination per Change is a v1 scope choice.** The schema
+  captures one primary team per change. Real changes often touch
+  multiple teams; the shape expansion is open-question §8.6 and
+  explicitly out of v1 scope.
 
 ### 3.7 Review & Audit
 
@@ -1331,13 +1342,23 @@ adjustments.
 
 ### 8.6 Multi-reviewer routing
 
-**State.** v1 routes each change to a single destination.
+**State.** v1 routes each change to a single *primary* destination by
+design — the schema (`Mapping.routing_destination` in `src/config.py`),
+the gold-set schema (`ExpectedMapping.routing_destination` in
+`src/evals.py`), and the mapping prompt + `MAPPING_SPEC` CallSpec in
+`src/mapping.py` all encode one destination per change. This is a
+scope decision, not a modeling claim about reality.
 
-**Open.** Some changes genuinely touch multiple teams.
+**Open.** Real regulatory changes often touch multiple teams in
+parallel — e.g. the Order 2222 telemetry requirement belongs primarily
+to IT & Metering but also to Market Operations (which configures DER
+aggregation offers around telemetry data). The current gold case
+labels the primary team per change; secondary teams aren't modelled.
 
 **Next move (v2).** `routing_destinations: tuple[Literal[...], ...]`
-with a primary + CC model. Workflow-engine decisions (who sees what
-first, cascading escalation) are v2 open design questions.
+with a primary + CC model. Workflow-engine decisions (one-approval-
+unblocks-all vs. all-must-approve, cascading escalation) are v2 open
+design questions.
 
 **Trigger.** Rachel's feedback shows systematic manual re-routing to a
 second team.

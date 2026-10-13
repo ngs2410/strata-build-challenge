@@ -123,6 +123,8 @@ class Mapping(BaseModel):
   change_id: str
   affected_items: tuple[AffectedItem, ...]
   recommended_action: Literal['review', 'amend', 'no_op']
+  # Single destination is a v1 scope choice. Real changes often touch multiple
+  # teams; expansion to tuple[Literal[...], ...] is open-question TDD §8.6.
   routing_destination: Literal['market_ops', 'legal', 'it_metering']
   confidence: int
   confidence_rationale: str

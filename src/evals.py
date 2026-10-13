@@ -38,6 +38,9 @@ class ExpectedMapping(BaseModel):
   affected_project_ids: tuple[str, ...]
   affected_document_ids: tuple[str, ...]
   recommended_action: Literal['review', 'amend', 'no_op']
+  # Mirrors Mapping.routing_destination's v1 single-destination scope choice
+  # (TDD §8.6). Gold labels the primary team per change; secondary teams
+  # aren't modelled yet.
   routing_destination: Literal['market_ops', 'legal', 'it_metering']
 
 

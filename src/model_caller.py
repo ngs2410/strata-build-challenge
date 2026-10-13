@@ -11,9 +11,7 @@ from src.telemetry import get_logger
 
 T = TypeVar('T', bound=BaseModel)
 
-BACKEND_STUB = 'stub://'
-BACKEND_OPENAI = 'openai://'
-BACKEND_JEV = 'jev://'
+FACADE_NAME = 'model_caller'
 
 MODEL_CACHE_DIR = Path('.model_cache')
 
@@ -105,17 +103,17 @@ class ModelCaller:
       'reasoning_effort': task_config.reasoning_effort,
       'verbosity': task_config.verbosity,
       'response_type': response_type.__name__,
-      'input': params.get('input', []),
-      'inputs_dict': params.get('inputs_dict', {}),
+      'input': params['input'],
+      'inputs_dict': params['inputs_dict'],
     }
     return orjson.dumps(key_dict, option=orjson.OPT_SORT_KEYS).decode()
 
   def _prompt_user(self, task_name: str, task_config: TaskModelConfig, params: dict) -> None:
-    rendered = params.get('input', '')
+    rendered = params['input']
     estimated_tokens = len(str(rendered)) // 4
-    inputs_dict = params.get('inputs_dict', {})
+    inputs_dict = params['inputs_dict']
     inputs_summary = ', '.join(
-      f'{INPUT_LABELS.get(k, k)}={len(str(v))}c' for k, v in inputs_dict.items()
+      f'{INPUT_LABELS[k]}={len(str(v))}c' for k, v in inputs_dict.items()
     )
     print(f'\n{"-" * 70}')
     print(f'[model_caller] task={task_name} model={task_config.model_identifier}')

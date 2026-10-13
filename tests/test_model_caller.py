@@ -2,9 +2,11 @@ from datetime import datetime, timezone
 
 import pytest
 
+from src.backends.openai_backend import BACKEND_PREFIX as BACKEND_OPENAI
+from src.backends.stub_backend import BACKEND_PREFIX as BACKEND_STUB
 from src.config import Passage, ProceedingVersion
 from src.llm import CallSpec
-from src.model_caller import BACKEND_OPENAI, BACKEND_STUB, ModelCaller
+from src.model_caller import ModelCaller
 from src.version_diff import VersionDiffResponse
 
 _CALL_SPEC = CallSpec(purpose='p', acceptance_criteria='a', failure_modes='f')

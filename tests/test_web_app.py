@@ -33,6 +33,23 @@ def test_queue_renders_review_items_after_pipeline(verdant_grid_seeded):
   assert 'market_ops' in response.text or 'legal' in response.text or 'it_metering' in response.text
 
 
+def test_queue_renders_citation_span_inline_with_mark(verdant_grid_seeded):
+  del verdant_grid_seeded
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  response = _client().get('/queue?tenant_id=verdant_grid&environment=prod')
+  assert response.status_code == 200
+  # The queue must show the passage text with the citing span wrapped
+  # in <mark>, not just the passage_id — PRD §3 says Rachel defends to
+  # the GC with evidence under every claim.
+  assert '<mark>' in response.text
+  assert '</mark>' in response.text
+  # Spot-check that actual Order 2222 proceeding text is present on
+  # the page (not just the passage id string).
+  assert 'aggregator' in response.text.lower() or 'telemetry' in response.text.lower()
+  # Verification status is surfaced per citation (verified or unverified).
+  assert 'verified' in response.text
+
+
 def test_audit_renders_empty_state_when_no_events(isolated_tenants_dir):
   del isolated_tenants_dir
   response = _client().get('/audit?tenant_id=verdant_grid&environment=prod')

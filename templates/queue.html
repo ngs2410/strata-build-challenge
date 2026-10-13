@@ -21,7 +21,12 @@
     .change-desc { max-width: 500px; font-size: 0.95em; }
     .affected-list { margin: 0.25em 0 0 1em; padding: 0; font-size: 0.85em; }
     .affected-list li { margin: 0.15em 0; }
-    .citation { font-size: 0.75em; color: #555; margin-top: 0.3em; }
+    .citation { font-size: 0.78em; color: #333; margin-top: 0.5em; padding: 0.4em 0.5em; background: #f8f8f8; border-left: 2px solid #ccc; }
+    .citation .label { color: #666; font-size: 0.9em; display: block; margin-bottom: 0.2em; }
+    .citation .passage-text { font-family: Georgia, serif; line-height: 1.4; white-space: pre-wrap; }
+    .citation mark { background: #ffe066; padding: 0 0.15em; }
+    .citation .verified { color: #080; }
+    .citation .unverified { color: #c80; }
     form.action { margin: 0; }
     textarea { width: 100%; min-height: 3em; font-family: inherit; font-size: 0.9em; box-sizing: border-box; }
     button { margin-right: 0.25em; margin-top: 0.3em; padding: 0.3em 0.7em; cursor: pointer; font-size: 0.9em; }
@@ -64,10 +69,40 @@
           {% if row.change %}
             <div><b>{{row.change.change_type}}:</b> {{row.change.description}}</div>
             {% if row.change.new_citation %}
-              <div class="citation">cite (new): <code>{{row.change.new_citation.passage_id}}</code>{% if row.change.new_citation.verified %} ✓{% endif %}</div>
+              {% set p = passages_by_id.get(row.change.new_citation.passage_id) %}
+              <div class="citation">
+                <span class="label">
+                  new citation: <code>{{row.change.new_citation.passage_id}}</code>
+                  {% if row.change.new_citation.verified %}
+                    <span class="verified">verified ✓</span>
+                  {% else %}
+                    <span class="unverified">unverified</span>
+                  {% endif %}
+                </span>
+                {% if p %}
+                  <span class="passage-text">{{p.text[:row.change.new_citation.start_offset]}}<mark>{{p.text[row.change.new_citation.start_offset:row.change.new_citation.end_offset]}}</mark>{{p.text[row.change.new_citation.end_offset:]}}</span>
+                {% else %}
+                  <span class="passage-text">(passage text unavailable)</span>
+                {% endif %}
+              </div>
             {% endif %}
             {% if row.change.prior_citation %}
-              <div class="citation">cite (prior): <code>{{row.change.prior_citation.passage_id}}</code>{% if row.change.prior_citation.verified %} ✓{% endif %}</div>
+              {% set p = passages_by_id.get(row.change.prior_citation.passage_id) %}
+              <div class="citation">
+                <span class="label">
+                  prior citation: <code>{{row.change.prior_citation.passage_id}}</code>
+                  {% if row.change.prior_citation.verified %}
+                    <span class="verified">verified ✓</span>
+                  {% else %}
+                    <span class="unverified">unverified</span>
+                  {% endif %}
+                </span>
+                {% if p %}
+                  <span class="passage-text">{{p.text[:row.change.prior_citation.start_offset]}}<mark>{{p.text[row.change.prior_citation.start_offset:row.change.prior_citation.end_offset]}}</mark>{{p.text[row.change.prior_citation.end_offset:]}}</span>
+                {% else %}
+                  <span class="passage-text">(passage text unavailable)</span>
+                {% endif %}
+              </div>
             {% endif %}
           {% elif row.mapping %}
             <div><code>{{row.mapping.change_id}}</code></div>

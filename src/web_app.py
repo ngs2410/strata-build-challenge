@@ -6,7 +6,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.review_queue import apply_action
-from src.stores import audit_log_store, change_store, mapping_store, review_item_store
+from src.stores import (
+  audit_log_store,
+  change_store,
+  mapping_store,
+  proceeding_store,
+  review_item_store,
+)
 
 TEMPLATES_DIR = Path('templates')
 
@@ -24,6 +30,7 @@ def queue(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
   review_items = _load_or_empty(review_item_store, tenant_id, environment)
   mappings = {m.mapping_id: m for m in _load_or_empty(mapping_store, tenant_id, environment)}
   changes = {c.change_id: c for c in _load_or_empty(change_store, tenant_id, environment)}
+  passages_by_id = _build_passages_by_id(tenant_id, environment)
   rows = []
   for item in sorted(review_items, key=lambda i: -i.priority):
     mapping = mappings.get(item.mapping_id)
@@ -36,8 +43,14 @@ def queue(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
       'tenant_id': tenant_id,
       'environment': environment,
       'rows': rows,
+      'passages_by_id': passages_by_id,
     },
   )
+
+
+def _build_passages_by_id(tenant_id: str, environment: str) -> dict:
+  versions = _load_or_empty(proceeding_store, tenant_id, environment)
+  return {p.passage_id: p for v in versions for p in v.passages}
 
 
 @app.get('/audit', response_class=HTMLResponse)

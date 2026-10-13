@@ -144,6 +144,42 @@ def test_detect_changes_rejects_mismatched_statuses():
     detect_changes(_version('draft', 'a'), _version('draft', 'b'))
 
 
+def test_version_diff_prompt_examples_are_from_adjacent_domains_not_order_2222():
+  # Worked examples teach a pattern — they must not restate the Order 2222
+  # test input or the model is "learning" by matching rather than by rule.
+  # The examples are drawn from SEC (broker-dealer) and HHS (HIPAA) per
+  # PRD §5's adjacent-domain expansion list.
+  from src.config import ProceedingVersion
+  from src.version_diff import build_version_diff_prompt
+
+  def _blank(status: str, version_id: str) -> ProceedingVersion:
+    return ProceedingVersion(
+      tenant_id='t',
+      environment='e',
+      proceeding_id='p',
+      version_id=version_id,
+      status=status,  # type: ignore[arg-type]
+      docket_number='D',
+      issued_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+      source_url='https://x',
+      passages=(),
+    )
+
+  spec = build_version_diff_prompt(_blank('draft', 'a'), _blank('final', 'b'))
+  _, user = spec.render()
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  # Order 2222 fact patterns MUST NOT appear in Details — those are what we
+  # test against. If they do, the model is being "taught to the test".
+  assert 'DER' not in details_section
+  assert 'RTO' not in details_section  # avoids RTO/ISO
+  assert 'telemetry' not in details_section.lower()
+  assert '100 kW' not in details_section
+  assert '60 days' not in details_section
+  # Positive — examples from SEC + HHS adjacent domains should appear.
+  assert 'broker-dealer' in details_section
+  assert 'HIPAA' in details_section
+
+
 def test_ground_citations_finds_substring_and_computes_offsets():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')

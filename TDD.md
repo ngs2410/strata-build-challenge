@@ -391,15 +391,21 @@ company-context JSON for a tenant. Normalise into Pydantic models
 `Store[T]` facades.
 
 **v1.**
-- Input: `data/tenants/verdant_grid/proceedings/order-2222-nopr.txt` +
-  `order-2222-final.txt` +
-  `data/tenants/verdant_grid/company_context.json`.
-- `src/ingest.py` reads each file, splits proceeding text into passages
-  via a lightweight structural parser (section-path extraction via regex
-  on section headers like `§35.28(g)(1)(ix)`), and constructs
-  `ProceedingVersion` + `Passage` models.
-- Driver:
-  `scripts/main_ingest.py --tenant_id=verdant_grid --environment=prod`.
+- Input: a per-tenant manifest at
+  `data/tenants/<tenant>/proceedings/manifest.json` listing each
+  proceeding version's metadata (`proceeding_id`, `version_id`,
+  `status`, `docket_number`, `issued_at`, `source_url`,
+  `text_file`), plus the referenced text files alongside the
+  manifest, plus `data/tenants/<tenant>/company_context.json`.
+- `src/ingest.py::ingest_tenant_fixture` iterates the manifest and
+  dispatches each entry to `ingest_proceeding_version`, which
+  splits text into passages via a lightweight structural parser
+  (section-path extraction via regex on section headers like
+  `§35.28(g)(1)(ix)`) and constructs `ProceedingVersion` + `Passage`
+  models.
+- Driver: `scripts/main_detect_changes.py --tenant_id=verdant_grid
+  --environment=prod` — ingest is embedded inline, not a separate
+  script (see §6.1 Decisions).
 
 **Production.**
 - Scheduled polling of FERC's eLibrary RSS feed; download new filings;
@@ -438,9 +444,17 @@ removed / tightened / loosened / cosmetic) and a description.
   field_intents / json_example). The rubric for `confidence` is in the
   prompt — criteria per 0–5 level.
 - Pydantic response model: `VersionDiffResponse` with
-  `changes: list[Change]`.
+  `changes: tuple[LlmChange, ...]`. `LlmChange` mirrors the
+  persisted `Change` (§2.3) but holds `LlmCitation` subobjects
+  (`passage_id` + `citing_span`) instead of `Citation`. Grounding
+  (§3.3) converts to the persisted `Change` with real `Citation`
+  (offsets computed by substring match).
+- The LLM-side / persisted-side split exists for every
+  claim-emitting stage; see §3.3 for the rationale (LLMs can't
+  count characters, so they emit the verbatim `citing_span` and
+  deterministic Python computes offsets).
 - Cardinality in v1: 1 LLM call per end-to-end run. Sequential loop (per
-  CLAUDE.md's revised fan-out rule for <20 items).
+  CLAUDE.md's sequential-at-v1-scale rule for <20 items).
 
 **Production.**
 - Full-document diffs can't fit in a single LLM context. Switch to a
@@ -600,9 +614,11 @@ confidence score (per the shared rubric).
   values with descriptions and worked examples, built programmatically
   from a data source (per PROMPT_CONVENTIONS.md §10).
 - Response model: `ObligationExtractionResponse` with
-  `extracted_obligations: list[ExtractedObligation]`. The
-  `ExtractedObligation` has fields `obligation_type`, `summary`,
-  `full_text`, `citation`, `confidence`, `confidence_rationale`.
+  `extracted_obligations: tuple[LlmExtractedObligation, ...]`.
+  `LlmExtractedObligation` mirrors the persisted `ExtractedObligation`
+  (§2.4) but carries `LlmCitation` (`passage_id` + `citing_span`)
+  instead of `Citation`. `ground_obligations` (§3.3) converts to the
+  persisted shape with real `Citation`.
 - Cardinality: 1 LLM call per version × 2 versions = 2 LLM calls per
   end-to-end run. Sequential, cached.
 
@@ -644,14 +660,21 @@ multi-reviewer open question).
 **v1.**
 - `src/mapping.py` runs **one LLM call** that sees:
   - The `Change` (with citation).
-  - The *full* Verdant company context — all obligations, projects,
-    documents rendered as enumerated lists per PROMPT_CONVENTIONS.md §5.
-- Returns a `Mapping` object: `affected_items` (tuple of `AffectedItem`
-  referring to context items by 0-based integer index),
-  `recommended_action`, `routing_destination`, overall `confidence`, and
-  `rationale`.
-- Cardinality: 1 LLM call per `Change` (~5 Changes per end-to-end run).
-  Sequential.
+  - The Verdant company context — obligations, projects, documents
+    rendered as enumerated lists per PROMPT_CONVENTIONS.md §5. Each
+    list is capped at `config.mapping.candidate_set_size` (default
+    50) before rendering; at v1 cardinality (16 items total) this
+    is a no-op, but the cap is active and tunable per tenant for
+    the TDD §3.6 scaling-path (a) handoff.
+- LLM response: `MappingResponse` with `affected_items:
+  tuple[AffectedItemByIndex, ...]` (`item_type` + `item_index: int`),
+  `recommended_action`, `routing_destination`, overall `confidence`,
+  `confidence_rationale`, and `rationale`.
+- `src/mapping.py::map_change` then resolves each `item_index` into
+  the corresponding `item_id` and returns the persisted `Mapping`
+  with `affected_items: tuple[AffectedItem, ...]` (`item_id: str`).
+- Cardinality: 1 LLM call per `Change` (3 Changes per end-to-end
+  run — matches the current gold case). Sequential.
 
 **Production — three distinct scaling paths**, each addressing a
 different scaling pressure. Not mutually exclusive; they combine.
@@ -685,10 +708,13 @@ different scaling pressure. Not mutually exclusive; they combine.
   Jev or LLM handles the long tail.
 
 **Decisions.**
-- **One LLM call sees the full context in v1.** 16-item context fits
-  comfortably in a single prompt; multiple LLM calls would introduce
-  reconciliation cost and inter-call inconsistency. At scale this
-  doesn't hold — paths (a) / (b) / (c) address that.
+- **One LLM call sees the full-or-capped context in v1.** 16-item
+  context fits comfortably in a single prompt and the
+  `candidate_set_size` cap is a no-op at v1 scale; multiple LLM
+  calls would introduce reconciliation cost and inter-call
+  inconsistency. The cap is wired from day one so the eventual
+  switch to scaling-path (a) is a config change, not a refactor.
+  Multiple-call decomposition at scale is paths (b) / (c) above.
 - **Index-based selection** (PROMPT_CONVENTIONS.md §5). LLM returns
   0-based integer indexes into the enumerated context; caller translates
   to IDs. Prevents ID hallucination.
@@ -919,11 +945,13 @@ JSON defaults, loaded per `(tenant_id, environment)`. Never in code.
 - `src/config.py::load_domain_config(tenant_id, environment)` is the one
   function that reads these; returns a validated `DomainConfig` Pydantic
   model.
-- Sub-models: `TaskModelConfig` (per LLM task — model id, max tokens,
-  reasoning effort, backend_type, included_inputs), `EscalationConfig`
-  (per-task escalation thresholds), `MappingConfig` (candidate-set size,
-  context window), `CitationConfig` (verification required y/n, min
-  citation offsets).
+- Sub-models: `TaskModelConfig` (per LLM task — `model_identifier`
+  (with backend URL prefix), `max_tokens`, `reasoning_effort`,
+  `verbosity`, `included_inputs`), `EscalationConfig` (`mapping_threshold`,
+  `citation_threshold`), `MappingConfig` (`candidate_set_size`,
+  `context_window_tokens`), `CitationConfig` (`verification_required`,
+  `min_citation_span_chars` — minimum `citing_span` width in characters;
+  grounding uses this as the unverified floor per §3.3).
 
 **Production.**
 - Postgres `domain_config_*` tables keyed by
@@ -951,20 +979,23 @@ JSON defaults, loaded per `(tenant_id, environment)`. Never in code.
 methods. Every method takes `(tenant_id, environment, ...)`.
 
 **v1.**
-- `src/stores.py` defines `Store[T]` ABC with
-  `save(tenant_id, environment, item: T) -> None`,
-  `load(tenant_id, environment, item_id: str) -> T`,
-  `list(tenant_id, environment, **filters) -> list[T]`,
-  `delete(tenant_id, environment, item_id: str) -> None`.
+- `src/stores.py` defines `Store[T]` ABC with two batch methods:
+  `save_all(tenant_id, environment, items: list[T]) -> None` and
+  `load_all(tenant_id, environment) -> list[T]`. No per-item CRUD —
+  v1 writes the full entity file at once per stage; all-or-nothing
+  semantics keep the write path atomic. Per-item surface (`load_by_id`,
+  `delete`, filter kwargs) is a prod-shape add through the facade
+  seam when a workflow actually needs it.
 - `JsonStore[T]` concrete: files at
-  `data/tenants/<tenant_id>/<environment>/<model_name>s.json` (one JSON
-  array per entity type). `list` loads the file and filters in Python;
-  `save` reads, updates/appends, writes.
+  `data/tenants/<tenant_id>/<environment>/<filename>` (one JSON array
+  per entity type). `save_all` serialises the full list and writes;
+  `load_all` reads and validates every item.
 - Audit log is special: `src/audit_log.py` uses `JsonlStore[AuditEvent]`
   — line-delimited JSON for cheap append.
 - Typed instances exported as module-level singletons:
-  `proceeding_store: Store[ProceedingVersion] = JsonStore[ProceedingVersion]()`,
-  etc.
+  `proceeding_store: Store[ProceedingVersion] = JsonStore(ProceedingVersion, 'proceedings.json')`,
+  etc. — the `JsonStore` constructor takes model type + filename as
+  positional args.
 
 **Production.**
 - `PostgresStore[T]` concrete — same ABC. Pydantic models round-trip via
@@ -1051,11 +1082,22 @@ a run and to compute cost per `(tenant_id, task_name)`.
 - `src/telemetry.py` configures `structlog` to emit JSON to stderr.
 - Log levels via `LOG_LEVEL` env var (a legitimate env-var use per
   CLAUDE.md — library-controlled).
-- Every LLM / Jev call logs `{task_name, model_id, backend_type,
-  tenant_id, environment, input_tokens, output_tokens,
-  estimated_cost_usd, cache_hit: bool, latency_ms}` at INFO.
-- Every stage logs start / end events with a correlation ID threaded
-  through for the run.
+- Every LLM dispatch emits two structlog events at INFO:
+  - `model_caller.call` with `{task_name, model_identifier,
+    tenant_id, environment, cache_hit: False}` — logged by the
+    `ModelCaller` chokepoint on every non-cached dispatch.
+  - `model_caller.cache_hit` with `{task_name, model_identifier,
+    tenant_id, environment}` — logged on diskcache hits (the
+    `cache_hit=False` field on `model_caller.call` disambiguates).
+  - `openai_backend.call` with `{task_name, model_name,
+    input_tokens, output_tokens, estimated_cost_usd}` — logged by
+    the OpenAI concrete after a successful dispatch; carries the
+    cost telemetry.
+- Retry events at WARN (`openai_backend.retry` with
+  `{attempt, next_delay_seconds, error_type}`) and ERROR
+  (`openai_backend.retry_exhausted`).
+- Every stage logs start / end events (`ingest.start` / `.done`,
+  `diff.start` / `.done`, etc.) with pipeline-scoped kwargs.
 
 **Production.**
 - OpenTelemetry Collector pipeline: Tempo for traces (per-run span
@@ -1131,16 +1173,24 @@ PRD. Without it, "citation precision ≥ 98%" and "mapping precision ≥
 
 ### 5.1 Gold Set
 
-- `data/evals/gold.json` — ~30 hand-labelled items, labelled by the
-  author as a proxy for Rachel.
-- Each item: `{input: {proceeding_version_pair, change_text,
-  company_context_slice}, expected: {changes: [...], obligations: [...],
-  mappings: [...], citations: [...]}}`.
-- Coverage: ~10 obligation extractions, ~5 change detections per version
-  pair (prior/final), ~5 mapping decisions, ~5 citation verifications
-  (positive + negative pairs).
-- Content: FERC Order 2222 §35.28(g)(1)(ix) in both NOPR and Final Rule
-  form, plus Verdant Grid company-context slices.
+- `data/evals/gold.json` — 1 hand-labelled case (FERC Order 2222
+  §35.28(g)(1)(ix)) with 16 aggregate labels, labelled by the
+  author as a proxy for Rachel: 3 expected changes + 3 citation
+  verifications + 7 obligation extractions + 3 mappings.
+- Schema (full source of truth in `src/evals.py`): each `GoldCase`
+  has
+  - `case_id: str`
+  - `input: GoldCaseInput` with `docket_number`, `proceeding_id`,
+    `prior_version_id`, `new_version_id`, `prior_version_file`,
+    `new_version_file`
+  - FLAT sibling fields: `expected_changes`,
+    `expected_verifications`, `expected_extractions`,
+    `expected_mappings`
+  - `company_context_tenant: str | None` — tenant to read the
+    company context from when scoring mappings
+- Content: FERC Order 2222 §35.28(g)(1)(ix) in both NOPR and Final
+  Rule form, plus Verdant Grid company-context slices (8
+  obligations / 3 projects / 5 documents).
 
 **Growing the gold set (production).** As Rachel reviews live traffic,
 every override produces a new ground-truth label. v1 logs these but does
@@ -1194,10 +1244,20 @@ Each has a reproducing eval case in the gold set.
   --gold_file=data/evals/gold.json` runs the full pipeline (ingest →
   diff → cite → extract → map) on gold inputs, compares to expected
   outputs, prints a metrics table and a text-rendered reliability
-  diagram, writes a JSON report to `output/evals/<timestamp>.json`.
-- `--k=5` runs on a 5-item slice for smoke testing (CLAUDE.md scripts
-  rule).
+  diagram, writes a JSON report to
+  `output/evals/<YYYYMMDD-HHMMSS>.json`.
+- Flags: `--tenant_id`, `--environment`, `--gold_file`,
+  `--output_dir`, `--md_output`, `--dry_run`, `--k`, `--profile`,
+  `--confirm_llm`.
+- `--k=5` runs on a 5-case slice for smoke testing (CLAUDE.md
+  scripts rule).
 - `--profile` emits a cProfile top-50 (CLAUDE.md scripts rule).
+- `--md_output=<path>` writes a human-readable markdown report
+  (headline-numbers table + full text report) alongside the JSON.
+  The `make eval-report` convenience target wires this to a dated
+  committed artifact at
+  `docs/eval-results/eval-results-<YYYY-MM-DD>.md` — the submission
+  trust-metric evidence.
 
 **Production.**
 - CI integration: every PR runs the eval harness; metric regressions
@@ -1235,13 +1295,17 @@ concrete:
 - `scripts/main_detect_changes.py --tenant_id --environment` — ingests
   and runs the §3.1–3.6 pipeline end-to-end in one command. v1 keeps
   ingest + pipeline combined (see Decisions below).
-- `scripts/main_review.py --tenant_id --environment --port=8000` —
-  launches the FastAPI web view (uvicorn wrapper).
+- `scripts/main_review.py [--host 127.0.0.1] [--port 8000] [--reload]`
+  — launches the FastAPI web view (uvicorn wrapper). `tenant_id` /
+  `environment` are HTTP query parameters on `/queue` and `/audit`,
+  not CLI flags — one process serves every tenant.
 - `scripts/main_eval.py --tenant_id --gold_file` — runs evals
   end-to-end.
 
-Every script supports `--dry_run`, `--k`, `--profile`, `--confirm_llm`
-(per CLAUDE.md).
+The pipeline scripts (`main_detect_changes.py`, `main_eval.py`)
+support `--dry_run`, `--k`, `--profile`, `--confirm_llm` (per
+CLAUDE.md). `main_review.py` is a thin uvicorn wrapper and only
+exposes `--host`, `--port`, `--reload`.
 
 **Production.**
 - Scheduled execution via cron / airflow. `main_detect_changes.py`

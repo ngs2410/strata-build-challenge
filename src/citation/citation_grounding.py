@@ -6,6 +6,18 @@ end_offset)` by `passage.text.find(citing_span)`. No fuzzy matching, no
 re-anchoring, no LLM round-trip. Counting characters is an LLM failure
 mode so Python does it.
 
+Matching strategy — two-stage:
+  1. Exact `passage.text.find(citing_span)` — zero-overhead fast path
+     that preserves original offsets exactly.
+  2. Whitespace-normalized fallback — if (1) misses, collapse every
+     whitespace run (newlines, tabs, repeated spaces) in BOTH passage
+     and span to a single space, retry, then back-map the match offsets
+     into the ORIGINAL passage. Hardens grounding against small-model
+     citing_spans that silently drop newlines mid-phrase (observed on
+     gpt-5.4-nano, which is a known failure mode across small models).
+     The stored `Citation` still carries offsets into the ORIGINAL
+     `passage.text` so downstream display preserves original whitespace.
+
 Two entry points:
   * `ground_citations_for_changes(llm_changes, prior, final)` — grounds
     both prior and new citations against the merged passage dict from BOTH
@@ -20,11 +32,11 @@ Failure cases (returned as `verified=False` with a specific
 `verification_rationale`, not raised — these are legitimate "unverified,
 needs reviewer" outcomes that `citation_verify` + the escalation threshold
 handle downstream):
-  * `citing_span` shorter than
+  * Normalized `citing_span` shorter than
     `DomainConfig.citation.min_citation_span_chars` — too thin to be a
     useful anchor; marked unverified with rationale.
-  * `passage.text.find(citing_span)` returns -1 — the LLM paraphrased or
-    truncated. Marked unverified with rationale.
+  * Neither exact nor whitespace-normalized match found — the LLM
+    paraphrased or truncated semantically. Marked unverified.
   * Successful grounding sets `verified=False` with rationale
     `'pending citation_verify stage'` — the `citation_verify` LLM task
     flips this to `True`/`False` based on whether the cited span actually
@@ -35,6 +47,7 @@ Hard failure (raises `ValueError`):
     This is a prompt-engineering bug, not a run-time data issue.
 '''
 
+import re
 from datetime import datetime, timezone
 
 from src.citation.llm_citation import LlmCitation
@@ -54,6 +67,8 @@ GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE: str = 'citing span not found in cited
 GROUNDING_FAILED_MIN_SPAN_FMT: str = (
   'span width {width} below citation.min_citation_span_chars={min_span}'
 )
+
+_WHITESPACE_RUN = re.compile(r'\s+')
 
 
 def is_grounding_pending(citation: Citation | None) -> bool:
@@ -131,18 +146,29 @@ def _resolve(
     )
   passage = passages[llm_citation.passage_index]
   citing_span = llm_citation.citing_span
-  if len(citing_span) < min_span:
+  normalized_span = _WHITESPACE_RUN.sub(' ', citing_span).strip()
+  if len(normalized_span) < min_span:
     return Citation(
       passage_id=passage.passage_id,
       start_offset=0,
       end_offset=0,
       verified=False,
       verification_rationale=GROUNDING_FAILED_MIN_SPAN_FMT.format(
-        width=len(citing_span), min_span=min_span
+        width=len(normalized_span), min_span=min_span
       ),
     )
-  start = passage.text.find(citing_span)
-  if start < 0:
+  exact_start = passage.text.find(citing_span)
+  if exact_start >= 0:
+    return Citation(
+      passage_id=passage.passage_id,
+      start_offset=exact_start,
+      end_offset=exact_start + len(citing_span),
+      verified=False,
+      verification_rationale=GROUNDING_PENDING_RATIONALE,
+    )
+  normalized_passage, orig_positions = _normalize_and_map(passage.text)
+  norm_start = normalized_passage.find(normalized_span)
+  if norm_start < 0:
     return Citation(
       passage_id=passage.passage_id,
       start_offset=0,
@@ -150,10 +176,30 @@ def _resolve(
       verified=False,
       verification_rationale=GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE,
     )
+  norm_end = norm_start + len(normalized_span)
+  orig_start = orig_positions[norm_start]
+  orig_end = orig_positions[norm_end - 1] + 1
   return Citation(
     passage_id=passage.passage_id,
-    start_offset=start,
-    end_offset=start + len(citing_span),
+    start_offset=orig_start,
+    end_offset=orig_end,
     verified=False,
     verification_rationale=GROUNDING_PENDING_RATIONALE,
   )
+
+
+def _normalize_and_map(text: str) -> tuple[str, list[int]]:
+  normalized_chars: list[str] = []
+  orig_positions: list[int] = []
+  in_whitespace = False
+  for i, ch in enumerate(text):
+    if ch.isspace():
+      if not in_whitespace:
+        normalized_chars.append(' ')
+        orig_positions.append(i)
+        in_whitespace = True
+    else:
+      normalized_chars.append(ch)
+      orig_positions.append(i)
+      in_whitespace = False
+  return ''.join(normalized_chars), orig_positions

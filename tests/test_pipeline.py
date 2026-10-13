@@ -226,6 +226,120 @@ def test_ground_citations_raises_on_out_of_range_passage_index():
     ground_citations_for_changes([lc], nopr, final)
 
 
+def _version_with_passage_text(text: str, version_id: str = 'nopr') -> ProceedingVersion:
+  return ProceedingVersion(
+    tenant_id='verdant_grid',
+    environment='prod',
+    proceeding_id='proc',
+    version_id=version_id,
+    status='draft',
+    docket_number='D1',
+    issued_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+    source_url='https://x',
+    passages=(
+      Passage(
+        passage_id=f'proc:{version_id}:§1:p1',
+        section_path=('§1',),
+        position=1,
+        text=text,
+      ),
+    ),
+  )
+
+
+def test_ground_citations_whitespace_normalized_fallback_matches_newline_in_passage():
+  # The LLM collapses newlines to spaces inside citing_span routinely at
+  # gpt-5.4-nano. Exact find() misses, but after whitespace normalization
+  # both sides collapse to the same string. The stored Citation's offsets
+  # MUST slice back to the ORIGINAL passage text (preserving the newline),
+  # not the normalized form.
+  original_text = (
+    'The aggregator shall not include a minimum size\n'
+    'requirement for the aggregated resources.'
+  )
+  nopr = _version_with_passage_text(original_text)
+  final = _version_with_passage_text(original_text, version_id='final')
+  # LLM collapsed the \n to a space.
+  collapsed_span = 'shall not include a minimum size requirement for the aggregated resources'
+  llm_cit = LlmCitation(passage_index=0, citing_span=collapsed_span)
+  lc = _llm_change('tightened', prior_citation=llm_cit)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  citation = grounded[0].prior_citation
+  assert citation.verification_rationale == GROUNDING_PENDING_RATIONALE
+  # Offsets slice back to the ORIGINAL text — preserving the newline.
+  original_substring = original_text[citation.start_offset : citation.end_offset]
+  assert original_substring == (
+    'shall not include a minimum size\nrequirement for the aggregated resources'
+  )
+
+
+def test_ground_citations_whitespace_normalized_fallback_handles_multiple_runs():
+  # Multiple whitespace runs (double spaces, newlines, tabs) in the
+  # passage all collapse to single spaces in the normalized form. The
+  # back-mapped offsets must span from the first non-space char to the
+  # last — covering the full original substring including the embedded
+  # whitespace runs.
+  original_text = 'foo  \n  bar\t\tbaz'  # "foo", then whitespace run, "bar", tab run, "baz"
+  nopr = _version_with_passage_text(original_text)
+  final = _version_with_passage_text(original_text, version_id='final')
+  collapsed_span = 'foo bar baz'
+  llm_cit = LlmCitation(passage_index=0, citing_span=collapsed_span)
+  lc = _llm_change('tightened', prior_citation=llm_cit)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  citation = grounded[0].prior_citation
+  assert citation.verification_rationale == GROUNDING_PENDING_RATIONALE
+  assert original_text[citation.start_offset : citation.end_offset] == 'foo  \n  bar\t\tbaz'
+
+
+def test_ground_citations_exact_match_preferred_over_normalized_fallback():
+  # When the LLM gives us the span verbatim with its original whitespace,
+  # the exact fast path should fire and we should get the exact offsets
+  # (no normalization artifact).
+  original_text = (
+    'The aggregator shall not include a minimum size\n'
+    'requirement for the aggregated resources.'
+  )
+  nopr = _version_with_passage_text(original_text)
+  final = _version_with_passage_text(original_text, version_id='final')
+  verbatim_span = 'shall not include a minimum size\nrequirement for the aggregated resources'
+  llm_cit = LlmCitation(passage_index=0, citing_span=verbatim_span)
+  lc = _llm_change('tightened', prior_citation=llm_cit)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  citation = grounded[0].prior_citation
+  assert citation.verification_rationale == GROUNDING_PENDING_RATIONALE
+  assert citation.start_offset == original_text.find(verbatim_span)
+  assert citation.end_offset == citation.start_offset + len(verbatim_span)
+
+
+def test_ground_citations_normalized_fallback_still_fails_on_real_mismatch():
+  # Whitespace normalization must not cause false positives — if the
+  # LLM paraphrased content words (not just whitespace), the match
+  # should still fail.
+  original_text = 'The aggregator shall register.'
+  nopr = _version_with_passage_text(original_text)
+  final = _version_with_passage_text(original_text, version_id='final')
+  paraphrase = 'The aggregator must register'  # "shall" → "must"
+  llm_cit = LlmCitation(passage_index=0, citing_span=paraphrase)
+  lc = _llm_change('tightened', prior_citation=llm_cit)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  assert grounded[0].prior_citation.verification_rationale == (
+    GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
+  )
+
+
+def test_ground_citations_min_span_check_uses_normalized_width():
+  # The min-span floor applies to the semantic anchor width (post-
+  # whitespace-collapse). A span of "The    " (3 non-whitespace chars
+  # padded with whitespace) must trip the min_span sentinel.
+  original_text = 'The aggregator shall register.'
+  nopr = _version_with_passage_text(original_text)
+  final = _version_with_passage_text(original_text, version_id='final')
+  padded = LlmCitation(passage_index=0, citing_span='The      ')  # 3 real chars
+  lc = _llm_change('tightened', prior_citation=padded)
+  grounded = ground_citations_for_changes([lc], nopr, final)
+  assert 'min_citation_span_chars' in grounded[0].prior_citation.verification_rationale
+
+
 def test_ground_citations_marks_unverified_when_span_below_min(verdant_grid_seeded):
   del verdant_grid_seeded
   nopr = _version('draft', 'nopr')

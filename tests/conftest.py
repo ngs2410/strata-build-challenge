@@ -26,6 +26,21 @@ def isolated_model_cache(monkeypatch, tmp_path):
   return cache_dir
 
 
+@pytest.fixture(autouse=True)
+def stub_all_task_configs(monkeypatch):
+  from src.config import load_domain_config as _real_load
+
+  def _stub_everything(tenant_id, environment):
+    config = _real_load(tenant_id, environment)
+    rewritten = {
+      name: tc.model_copy(update={'model_identifier': f'stub://{name}'})
+      for name, tc in config.task_model_configs.items()
+    }
+    return config.model_copy(update={'task_model_configs': rewritten})
+
+  monkeypatch.setattr('src.model_caller.load_domain_config', _stub_everything)
+
+
 @pytest.fixture
 def isolated_tenants_dir(monkeypatch, tmp_path):
   override = tmp_path / 'tenants'

@@ -44,21 +44,6 @@ def test_jev_backend_matches_only_jev_prefix():
   assert backend.matches(f'{STUB_PREFIX}x') is False
 
 
-def test_openai_backend_call_raises_not_implemented():
-  class _Unused(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    x: int
-
-  with pytest.raises(NotImplementedError, match='follow-up commit'):
-    OpenAIBackend().call(
-      task_name='version_diff',
-      task_config=_task_config('openai://gpt-5'),
-      params={},
-      response_type=_Unused,
-      call_spec=_CALL_SPEC,
-    )
-
-
 def test_jev_backend_call_raises_not_implemented():
   class _Unused(BaseModel):
     model_config = ConfigDict(extra='forbid')

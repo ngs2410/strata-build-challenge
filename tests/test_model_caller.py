@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
 
 import pytest
-from pydantic import BaseModel, ConfigDict
 
-from src.config import Passage, ProceedingVersion, TaskModelConfig
+from src.config import Passage, ProceedingVersion
 from src.llm import CallSpec
 from src.model_caller import BACKEND_OPENAI, BACKEND_STUB, ModelCaller
 from src.version_diff import VersionDiffResponse
@@ -139,45 +138,3 @@ def test_cache_key_changes_with_input(verdant_grid_seeded, isolated_model_cache)
       environment='prod',
     )
   assert len(list(caller._cache.iterkeys())) == 2
-
-
-def test_call_raises_not_implemented_through_facade_when_pointed_at_openai(
-  verdant_grid_seeded, monkeypatch
-):
-  del verdant_grid_seeded
-  monkeypatch.setattr(
-    'src.model_caller.load_domain_config',
-    lambda tenant_id, environment: _config_with_openai_version_diff(),
-  )
-  caller = ModelCaller()
-
-  class _ThrowawayResponse(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    changes: tuple = ()
-
-  with pytest.raises(NotImplementedError):
-    caller.call(
-      task_name='version_diff',
-      params={'input': [], 'inputs_dict': {}},
-      response_type=_ThrowawayResponse,
-      call_spec=_CALL_SPEC,
-      tenant_id='verdant_grid',
-      environment='prod',
-    )
-
-
-def _config_with_openai_version_diff():
-  from src.config import DomainConfig, EscalationConfig
-
-  return DomainConfig(
-    escalation=EscalationConfig(mapping_threshold=3, citation_threshold=3),
-    task_model_configs={
-      'version_diff': TaskModelConfig(
-        model_identifier='openai://gpt-5.4-nano',
-        max_tokens=4096,
-        reasoning_effort='low',
-        verbosity='low',
-        included_inputs=(),
-      )
-    },
-  )

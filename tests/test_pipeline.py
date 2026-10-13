@@ -173,6 +173,29 @@ def test_map_change_routes_by_change_type(change_type, expected_destination, exp
   assert mapping.recommended_action == expected_action
 
 
+def test_map_change_translates_llm_index_response_into_item_ids(verdant_grid_seeded):
+  del verdant_grid_seeded
+  from src.ingest import ingest_company_context
+
+  obligations, projects, documents = ingest_company_context('verdant_grid', 'prod')
+  mapping = map_change(
+    _change('added'),
+    obligations=obligations,
+    projects=projects,
+    documents=documents,
+  )
+  valid_obligation_ids = {o.obligation_id for o in obligations}
+  valid_project_ids = {p.project_id for p in projects}
+  valid_document_ids = {d.document_id for d in documents}
+  valid_by_type = {
+    'obligation': valid_obligation_ids,
+    'project': valid_project_ids,
+    'document': valid_document_ids,
+  }
+  for item in mapping.affected_items:
+    assert item.item_id in valid_by_type[item.item_type]
+
+
 def test_enqueue_mapping_escalates_below_threshold():
   item = enqueue_mapping(_mapping(confidence=2), _config(threshold=3))
   assert item.status == 'escalated'

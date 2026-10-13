@@ -295,3 +295,17 @@ file + line range for its topic — see [TDD.md](TDD.md).
   ([`src/backends/jev_backend.py`](src/backends/jev_backend.py));
   alternative providers land through the existing
   [`Backend.matches`](src/model_caller.py) facade.
+- **Small-model calibration gaps at `gpt-5.4-nano`** — every task is
+  pinned to `openai://gpt-5.4-nano` in
+  [`config/default_domain_config.json`](config/default_domain_config.json)
+  to keep per-run spend inside the challenge free tier. At that size the
+  model occasionally (a) collapses newlines inside a `citing_span`
+  so the deterministic substring match in
+  [`citation_grounding`](src/citation/citation_grounding.py) returns
+  -1, and (b) over-calibrates `confidence` to 5 on perspective-dependent
+  or boundary-case classifications. Both failure modes degrade safely
+  — low-confidence or unverified items escalate to Rachel's queue via
+  the citation + confidence gates rather than silently ship. Mitigation
+  is a one-line swap of `model_identifier` to a larger OpenAI tier per
+  tenant / task; the pipeline, prompts, grounding, and eval harness
+  are unchanged.

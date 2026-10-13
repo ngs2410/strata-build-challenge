@@ -147,8 +147,8 @@ def test_detect_changes_rejects_mismatched_statuses():
 def test_version_diff_prompt_examples_are_from_adjacent_domains_not_order_2222():
   # Worked examples teach a pattern — they must not restate the Order 2222
   # test input or the model is "learning" by matching rather than by rule.
-  # The examples are drawn from SEC (broker-dealer) and HHS (HIPAA) per
-  # PRD §5's adjacent-domain expansion list.
+  # The examples are drawn from SEC (broker-dealer), HHS (HIPAA), and
+  # FinCEN (SAR filing) per PRD §5's adjacent-domain expansion list.
   from src.config import ProceedingVersion
   from src.version_diff import build_version_diff_prompt
 
@@ -175,9 +175,10 @@ def test_version_diff_prompt_examples_are_from_adjacent_domains_not_order_2222()
   assert 'telemetry' not in details_section.lower()
   assert '100 kW' not in details_section
   assert '60 days' not in details_section
-  # Positive — examples from SEC + HHS adjacent domains should appear.
-  assert 'broker-dealer' in details_section
-  assert 'HIPAA' in details_section
+  # Positive — all three adjacent-domain examples should appear.
+  assert 'broker-dealer' in details_section  # Example 1 (SEC)
+  assert 'HIPAA' in details_section  # Example 2 (HHS)
+  assert 'FinCEN' in details_section  # Example 3 (banking / OCC)
 
 
 def test_ground_citations_finds_substring_and_computes_offsets():

@@ -80,3 +80,33 @@ def test_added_and_removed_descriptions_name_null_citation_sides():
   # emitted on added changes).
   assert 'prior_citation must be null' in CHANGE_TYPES['added']
   assert 'new_citation must be null' in CHANGE_TYPES['removed']
+
+
+def test_added_description_distinguishes_standalone_from_parameter_modification():
+  # Third observed misclassification pattern: the model treated a new
+  # 60-day timing clause ("§(B) 60 days before participation") as "added"
+  # when the registration obligation it timed had existed before. The
+  # `added` definition must explicitly rule this out — parameter
+  # modifications are tightened/loosened, not added.
+  assert 'STANDALONE' in CHANGE_TYPES['added']
+  assert 'parameters' in CHANGE_TYPES['added']
+  assert 'tightened' in CHANGE_TYPES['added']  # the pointer to the right type
+
+
+def test_tightened_description_names_the_common_parameter_types():
+  # The classifier needs concrete examples of what counts as a parameter
+  # modification. Timing, data elements, thresholds, scope are the four
+  # observed cases in the FERC / HIPAA / SEC domains Strata targets.
+  tightened = CHANGE_TYPES['tightened']
+  assert 'timing' in tightened
+  assert 'data element' in tightened
+  assert 'threshold' in tightened
+  assert 'scope' in tightened
+
+
+def test_tightened_and_loosened_name_the_grouping_rule():
+  # Sub-modifications to the same obligation group into ONE change —
+  # this is the fourth observed failure mode (two added changes for the
+  # §(B) 60-day timing + point-of-interconnection).
+  assert 'group' in CHANGE_TYPES['tightened'].lower()
+  assert 'group' in CHANGE_TYPES['loosened'].lower()

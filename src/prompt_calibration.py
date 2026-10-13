@@ -99,11 +99,14 @@ REGULATED_ENTITY_PERSPECTIVE: str = (
 
 CHANGE_TYPES: dict[str, str] = {
   'added': (
-    'A new obligation or clause present in the new version that did not '
-    'exist in the prior version. Use when the regulated entity now has '
-    'to do something they had no corresponding duty to do before — even '
-    'if the new clause is grafted onto a passage that already existed. '
-    'prior_citation must be null.'
+    'A wholly-NEW STANDALONE obligation present in the new version that '
+    'did not exist in the prior version. The regulated entity now has to '
+    'perform an ACTION they had no corresponding duty to perform before. '
+    'An added obligation COULD stand alone even when it is written into '
+    'the same paragraph as other obligations. Does NOT apply when a new '
+    'clause modifies the parameters (timing, required data elements, '
+    'thresholds, scope) of an EXISTING obligation — those are tightened '
+    'or loosened. prior_citation must be null.'
   ),
   'removed': (
     'An obligation or clause that existed in the prior version and is '
@@ -111,16 +114,24 @@ CHANGE_TYPES: dict[str, str] = {
     'something they previously had to do. new_citation must be null.'
   ),
   'tightened': (
-    "An existing obligation whose scope widened, threshold stricter, or "
-    "compliance burden heavier FOR THE REGULATED ENTITY. Includes "
+    'An existing obligation whose parameters got stricter FOR THE '
+    'REGULATED ENTITY — common cases: adding a timing requirement '
+    "(e.g. '... within 30 days'), adding a required data element to a "
+    "reporting list (e.g. '... including the point of interconnection'), "
+    'lowering a threshold, widening scope of who/what is covered, '
+    'adding a precondition that must be satisfied. Also includes '
     "regulator-side changes (e.g. 'the RTO may now impose a minimum "
-    "size') that create de facto new burden on the entity."
+    "size') that create de facto new burden on the entity. If multiple "
+    "parameters tighten the SAME underlying obligation, group them into "
+    'ONE change (see Additional rules in the task prompt).'
   ),
   'loosened': (
-    "An existing obligation whose scope narrowed, threshold laxer, or "
-    "compliance burden lighter FOR THE REGULATED ENTITY. Includes "
-    "regulator-side changes that lift a burden the entity previously "
-    "faced."
+    'An existing obligation whose parameters got laxer FOR THE '
+    'REGULATED ENTITY — relaxed timing, dropped required data elements, '
+    'raised threshold, narrowed scope, removed precondition. Also '
+    'includes regulator-side changes that lift a burden the entity '
+    'previously faced. If multiple parameters loosen the SAME '
+    'underlying obligation, group them into ONE change.'
   ),
   'cosmetic': (
     'A re-wording, re-numbering, or re-formatting that preserves the '

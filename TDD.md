@@ -155,7 +155,7 @@ class ProceedingVersion(BaseModel):
     passages: tuple[Passage, ...]
 ```
 
-_Source: [`src/config.py` L22-L32](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L22-L32)._
+_Source: [`src/config.py` L51-L61](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L51-L61)._
 
 **Decisions.**
 - **`status` is a required `Literal`, not a classifier task.** The user
@@ -177,7 +177,7 @@ class Passage(BaseModel):
     text: str
 ```
 
-_Source: [`src/config.py` L14-L19](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L14-L19)._
+_Source: [`src/config.py` L43-L48](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L43-L48)._
 
 **Decisions.**
 - **Structural, human-readable `passage_id`** of the form
@@ -219,7 +219,7 @@ class Citation(BaseModel):
     verification_rationale: str
 ```
 
-_Source: `Change` [`src/config.py` L44-L56](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L44-L56), `Citation` [`src/config.py` L35-L41](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L35-L41)._
+_Source: `Change` [`src/config.py` L73-L85](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L73-L85), `Citation` [`src/config.py` L64-L70](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L64-L70)._
 
 **Decisions.**
 - **`change_type` is a closed Literal of five values.** Flagged in
@@ -276,7 +276,7 @@ class Document(BaseModel):
     owner: Literal['market_ops', 'legal', 'it_metering']
 ```
 
-_Source: `Obligation` [`src/config.py` L74-L84](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L74-L84), `Project` [`src/config.py` L87-L96](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L87-L96), `Document` [`src/config.py` L99-L109](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L99-L109). Seed data: [`data/tenants/verdant_grid/company_context.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/tenants/verdant_grid/company_context.json)._
+_Source: `Obligation` [`src/config.py` L103-L113](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L103-L113), `Project` [`src/config.py` L116-L125](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L116-L125), `Document` [`src/config.py` L128-L138](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L128-L138). Seed data: [`data/tenants/verdant_grid/company_context.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/tenants/verdant_grid/company_context.json)._
 
 **Decisions.**
 - **Three peer models, not one `CompanyThing`.** Different schemas,
@@ -314,7 +314,7 @@ class AffectedItem(BaseModel):
     match_rationale: str
 ```
 
-_Source: persisted `Mapping` [`src/config.py` L120-L133](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L120-L133), persisted `AffectedItem` [`src/config.py` L112-L117](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L112-L117). LLM-side intermediate `AffectedItemByIndex` + `MappingResponse` live in [`src/mapping.py` L43-L58](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L43-L58) — see §3.6 for the index→id translation._
+_Source: persisted `Mapping` [`src/config.py` L149-L162](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L149-L162), persisted `AffectedItem` [`src/config.py` L141-L146](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L141-L146). LLM-side intermediate `AffectedItemByIndex` + `MappingResponse` live in [`src/mapping.py` L79-L94](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L79-L94) — see §3.6 for the index→id translation._
 
 **Decisions.**
 - **One `Mapping` per `Change`, with a tuple of `AffectedItem`
@@ -354,7 +354,7 @@ A `ReviewItem` is a reader's lens over a `Mapping` — see §3.7. `status`
 is the current fold over `AuditEvent`s, not a mutable column (per
 CLAUDE.md invariant).
 
-_Source: [`src/config.py` L136-L144](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L136-L144)._
+_Source: [`src/config.py` L165-L173](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L165-L173)._
 
 ### 2.7 AuditEvent
 
@@ -383,7 +383,7 @@ class AuditEvent(BaseModel):
     rationale: str | None
 ```
 
-_Source: [`src/config.py` L147-L168](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L147-L168). Append-only JSONL log + `log_event()` helper in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py)._
+_Source: [`src/config.py` L176-L197](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L176-L197). Append-only JSONL log + `log_event()` helper in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py)._
 
 **Decisions.**
 - **`prior_value_json` and `new_value_json` are serialized JSON strings
@@ -415,7 +415,7 @@ company-context JSON for a tenant. Normalise into Pydantic models
 (`ProceedingVersion`, `Obligation`, `Project`, `Document`). Persist via
 `Store[T]` facades.
 
-_Source: [`src/ingest.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py) (`ingest_tenant_fixture` [L106](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L106), `ingest_proceeding_version` [L55](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L55), `ingest_company_context` [L81](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L81)). Per-tenant manifest: [`data/tenants/verdant_grid/proceedings/manifest.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/tenants/verdant_grid/proceedings/manifest.json)._
+_Source: [`src/ingest.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py) (`ingest_tenant_fixture` [L137](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L137), `ingest_proceeding_version` [L86](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L86), `ingest_company_context` [L112](https://github.com/ngs2410/strata-build-challenge/blob/main/src/ingest.py#L112)). Per-tenant manifest: [`data/tenants/verdant_grid/proceedings/manifest.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/tenants/verdant_grid/proceedings/manifest.json)._
 
 **v1.**
 - Input: a per-tenant manifest at
@@ -461,7 +461,7 @@ _Source: [`src/ingest.py`](https://github.com/ngs2410/strata-build-challenge/blo
 detect material changes between them. Each change gets a type (added /
 removed / tightened / loosened / cosmetic) and a description.
 
-_Source: [`src/version_diff.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py) — `LlmChange` [L83-L94](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L83-L94), `VersionDiffResponse` [L98-L100](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L98-L100), `detect_changes` [L233](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L233)._
+_Source: [`src/version_diff.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py) — `LlmChange` [L123-L135](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L123-L135), `VersionDiffResponse` [L138-L140](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L138-L140), `detect_changes` [L273](https://github.com/ngs2410/strata-build-challenge/blob/main/src/version_diff.py#L273)._
 
 **v1.**
 - `src/version_diff.py` runs **one LLM task per subsection** with both
@@ -525,7 +525,7 @@ _Source: [`src/version_diff.py`](https://github.com/ngs2410/strata-build-challen
 the source `Passage` that supports the claim. This is the core trust
 property of the product.
 
-_Source: [`src/citation/citation_grounding.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py) (`ground_citations_for_changes` [L14](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L14), `ground_obligations` [L40](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L40), `_resolve` [L70](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L70)). LLM-side shape: [`src/citation/llm_citation.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/llm_citation.py)._
+_Source: [`src/citation/citation_grounding.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py) (`ground_citations_for_changes` [L51](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L51), `ground_obligations` [L77](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L77), `_resolve` [L107](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L107)). LLM-side shape: [`src/citation/llm_citation.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/llm_citation.py)._
 
 **v1.**
 - The LLM task that produces changes (§3.2) returns an `LlmChange`
@@ -594,7 +594,7 @@ cited passage actually supports the claim. Failures surface in
 `Citation.verified = False` with a rationale; downstream code treats
 unverified claims as low-confidence and routes them to escalation.
 
-_Source: [`src/citation/citation_verify.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py) — `CitationVerificationResponse` [L33-L35](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py#L33-L35), `verify_citations` [L119](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py#L119)._
+_Source: [`src/citation/citation_verify.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py) — `CitationVerificationResponse` [L70-L72](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py#L70-L72), `verify_citations` [L156](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_verify.py#L156)._
 
 **v1.**
 - `src/citation/citation_verify.py` runs a dedicated LLM task per claim.
@@ -641,7 +641,7 @@ new regulatory obligations the passage establishes. Each
 `ExtractedObligation` carries a structural citation (per §3.3) and a
 confidence score (per the shared rubric).
 
-_Source: [`src/obligation_extraction.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py) — `LlmExtractedObligation` [L40-L52](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L40-L52), `ObligationExtractionResponse` [L55-L57](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L55-L57), `extract_obligations` [L141](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L141). Grounding: `ground_obligations` in [`src/citation/citation_grounding.py` L40](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L40)._
+_Source: [`src/obligation_extraction.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py) — `LlmExtractedObligation` [L66-L78](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L66-L78), `ObligationExtractionResponse` [L81-L83](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L81-L83), `extract_obligations` [L167](https://github.com/ngs2410/strata-build-challenge/blob/main/src/obligation_extraction.py#L167). Grounding: `ground_obligations` in [`src/citation/citation_grounding.py` L77](https://github.com/ngs2410/strata-build-challenge/blob/main/src/citation/citation_grounding.py#L77)._
 
 **v1.**
 - `src/obligation_extraction.py` runs an LLM task per subsection. Prompt
@@ -693,7 +693,7 @@ internal destination (one of three in v1 — see [§8.6](#86-multi-reviewer-rout
 for the multi-reviewer open question; mirrored at
 [PRD §7 bullet 6](PRD.md#7-open-questions-and-unvalidated-assumptions)).
 
-_Source: [`src/mapping.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py) — `AffectedItemByIndex` [L43-L48](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L43-L48), `MappingResponse` [L51-L58](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L51-L58), `build_mapping_prompt` [L83](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L83), `map_change` [L203](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L203), `_resolve_affected_item` (index→id translation) [L249](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L249)._
+_Source: [`src/mapping.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py) — `AffectedItemByIndex` [L79-L84](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L79-L84), `MappingResponse` [L87-L94](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L87-L94), `build_mapping_prompt` [L119](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L119), `map_change` [L239](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L239), `_resolve_affected_item` (index→id translation) [L285](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L285)._
 
 **v1.**
 - `src/mapping.py` runs **one LLM call** that sees:
@@ -776,7 +776,7 @@ the queue. Every transition is logged to the append-only audit log.
 Current state (status, owner, action) is a fold over the log — rollback
 is replay-to-timestamp.
 
-_Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py) (`enqueue_mapping` [L23](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L23), `_escalation_threshold` [L43](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L43), `apply_action` [L56](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L56)); audit log in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py) (`log_event` [L11](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py#L11))._
+_Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py) (`enqueue_mapping` [L59](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L59), `_escalation_threshold` [L79](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L79), `apply_action` [L92](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L92)); audit log in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py) (`log_event` [L39](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py#L39))._
 
 **v1.**
 - `src/review_queue.py` constructs `ReviewItem`s from `Mapping`s.
@@ -845,7 +845,7 @@ _Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challen
 (diskcache with plaintext JSON keys), retries, response-model coercion,
 cost telemetry, backend selection.
 
-_Source: [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py) — `Backend` Protocol [L20](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L20), `ModelCaller` [L41](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L41). Backends: [`src/backends/openai_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/openai_backend.py) (retry logic + cost telemetry), [`src/backends/jev_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/jev_backend.py) (NotImplementedError shell), [`src/backends/stub_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/stub_backend.py)._
+_Source: [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py) — `Backend` Protocol [L60](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L60), `ModelCaller` [L81](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L81). Backends: [`src/backends/openai_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/openai_backend.py) (retry logic + cost telemetry), [`src/backends/jev_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/jev_backend.py) (NotImplementedError shell), [`src/backends/stub_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/stub_backend.py)._
 
 **v1.**
 - `src/model_caller.py::ModelCaller.call(task_name, params, response_type,
@@ -934,7 +934,7 @@ vendor dependencies" principle.
 **Role.** Author, version, and dispatch LLM-task prompts with a
 consistent structure. Prompts are release artefacts, not inline strings.
 
-_Source: `PromptSpec` + `CallSpec` dataclasses in [`src/llm.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py) (`PromptSpec` [L21](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py#L21), `CallSpec` [L69](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py#L69)). Shared rubric constants in [`src/prompt_calibration.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/prompt_calibration.py). Task-name → prompt-builder registry in [`src/prompt_registry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/prompt_registry.py)._
+_Source: `PromptSpec` + `CallSpec` dataclasses in [`src/llm.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py) (`PromptSpec` [L49](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py#L49), `CallSpec` [L97](https://github.com/ngs2410/strata-build-challenge/blob/main/src/llm.py#L97)). Shared rubric constants in [`src/prompt_calibration.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/prompt_calibration.py). Task-name → prompt-builder registry in [`src/prompt_registry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/prompt_registry.py)._
 
 **v1.**
 - Every LLM task has a dedicated module (`src/version_diff.py`,
@@ -981,7 +981,7 @@ _Source: `PromptSpec` + `CallSpec` dataclasses in [`src/llm.py`](https://github.
 **Role.** All hyperparameters live in `DomainConfig` sub-models with
 JSON defaults, loaded per `(tenant_id, environment)`. Never in code.
 
-_Source: `DomainConfig` + sub-models in [`src/config.py` L171-L213](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L171-L213) (`EscalationConfig` [L171](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L171), `MappingConfig` [L177](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L177), `CitationConfig` [L183](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L183), `TaskModelConfig` [L189](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L189), `DomainConfig` [L198](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L198)); loader `load_domain_config` [L206](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L206) with deep-merge of tenant override. Defaults: [`config/default_domain_config.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/config/default_domain_config.json)._
+_Source: `DomainConfig` + sub-models in [`src/config.py` L200-L242](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L200-L242) (`EscalationConfig` [L200](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L200), `MappingConfig` [L206](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L206), `CitationConfig` [L212](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L212), `TaskModelConfig` [L218](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L218), `DomainConfig` [L227](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L227)); loader `load_domain_config` [L235](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L235) with deep-merge of tenant override. Defaults: [`config/default_domain_config.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/config/default_domain_config.json)._
 
 **v1.**
 - `config/default_domain_config.json` — baseline for all tenants.
@@ -1024,7 +1024,7 @@ _Source: `DomainConfig` + sub-models in [`src/config.py` L171-L213](https://gith
 **Role.** Save and load Pydantic models with backend-agnostic facade
 methods. Every method takes `(tenant_id, environment, ...)`.
 
-_Source: [`src/stores.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py) — `Store` ABC [L28-L33](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L28-L33), `JsonStore` [L36-L53](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L36-L53), `JsonlStore` [L56-L79](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L56-L79), module-level singletons [L82-L92](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L82-L92)._
+_Source: [`src/stores.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py) — `Store` ABC [L63-L68](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L63-L68), `JsonStore` [L71-L88](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L71-L88), `JsonlStore` [L91-L114](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L91-L114), module-level singletons [L117-L127](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py#L117-L127)._
 
 **v1.**
 - `src/stores.py` defines `Store[T]` ABC with two batch methods:
@@ -1071,7 +1071,7 @@ _Source: [`src/stores.py`](https://github.com/ngs2410/strata-build-challenge/blo
 tenant B. Enable multi-environment deployment (dev / staging / prod)
 within a tenant.
 
-_Source: tenant list + `DEFAULT_ENVIRONMENT` in [`src/tenant_registry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/tenant_registry.py). Per-tenant data lives under [`data/tenants/`](https://github.com/ngs2410/strata-build-challenge/tree/main/data/tenants); the `(tenant_id, environment)` leading-param rule is enforced on every facade method in [`src/stores.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py), [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L206), and [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L41)._
+_Source: tenant list + `DEFAULT_ENVIRONMENT` in [`src/tenant_registry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/tenant_registry.py). Per-tenant data lives under [`data/tenants/`](https://github.com/ngs2410/strata-build-challenge/tree/main/data/tenants); the `(tenant_id, environment)` leading-param rule is enforced on every facade method in [`src/stores.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/stores.py), [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L235), and [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L81)._
 
 **v1.**
 - Every facade method takes `(tenant_id, environment)` as leading
@@ -1128,7 +1128,7 @@ reject shared-database designs on principle. The `Store[T]` facade +
 **Role.** Structured logging of every interesting event; enough to debug
 a run and to compute cost per `(tenant_id, task_name)`.
 
-_Source: [`src/telemetry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py) (`configure_logging` [L12](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L12), `get_logger` [L29](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L29)). Cost telemetry emission in [`src/backends/openai_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/openai_backend.py)._
+_Source: [`src/telemetry.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py) (`configure_logging` [L31](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L31), `get_logger` [L48](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L48)). Cost telemetry emission in [`src/backends/openai_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/openai_backend.py)._
 
 **v1.**
 - `src/telemetry.py` configures `structlog` to emit JSON to stderr.
@@ -1175,7 +1175,7 @@ _Source: [`src/telemetry.py`](https://github.com/ngs2410/strata-build-challenge/
 **Role.** Keep secrets out of source; keep tenants isolated from each
 other; keep auditable records of who did what.
 
-_Source: dotenv loading in `configure_logging` ([`src/telemetry.py` L12](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L12)). Secret template: [`.env.example`](https://github.com/ngs2410/strata-build-challenge/blob/main/.env.example). Actor plumbing on every state transition: [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py)._
+_Source: dotenv loading in `configure_logging` ([`src/telemetry.py` L31](https://github.com/ngs2410/strata-build-challenge/blob/main/src/telemetry.py#L31)). Secret template: [`.env.example`](https://github.com/ngs2410/strata-build-challenge/blob/main/.env.example). Actor plumbing on every state transition: [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py)._
 
 **v1.**
 - Secrets (`OPENAI_API_KEY`, future `TYPESAFE_API_KEY`) loaded via
@@ -1227,7 +1227,7 @@ PRD. Without it, "citation precision ≥ 98%" and "mapping precision ≥
 
 ### 5.1 Gold Set
 
-_Source: gold data [`data/evals/gold.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/evals/gold.json); schemas in [`src/evals.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py) — `ExpectedChange` [L11](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L11), `ExpectedVerification` [L19](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L19), `ExpectedExtraction` [L26](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L26), `ExpectedMapping` [L34](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L34), `GoldCaseInput` [L47](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L47), `GoldCase` [L57](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L57)._
+_Source: gold data [`data/evals/gold.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/evals/gold.json); schemas in [`src/evals.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py) — `ExpectedChange` [L57](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L57), `ExpectedVerification` [L65](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L65), `ExpectedExtraction` [L72](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L72), `ExpectedMapping` [L80](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L80), `GoldCaseInput` [L93](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L93), `GoldCase` [L103](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L103)._
 
 - `data/evals/gold.json` — 1 hand-labelled case (FERC Order 2222
   §35.28(g)(1)(ix)) with 16 aggregate labels, labelled by the
@@ -1258,7 +1258,7 @@ expert review before promotion.
 Each metric is computed by `src/evals.py`. The eval harness emits a
 report (JSON + markdown) on every end-to-end run.
 
-_Source: scoring in [`src/evals.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py) (`evaluate_case` [L108](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L108), `score_verifications` [L136](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L136), `score_extractions` [L158](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L158), `score_mappings` [L190](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L190), `aggregate` [L365](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L365), `render_text_report` [L470](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L470), `render_markdown_report` [L547](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L547))._
+_Source: scoring in [`src/evals.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py) (`evaluate_case` [L154](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L154), `score_verifications` [L182](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L182), `score_extractions` [L204](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L204), `score_mappings` [L236](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L236), `aggregate` [L411](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L411), `render_text_report` [L516](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L516), `render_markdown_report` [L593](https://github.com/ngs2410/strata-build-challenge/blob/main/src/evals.py#L593))._
 
 | Metric                            | Shape                                                                         | Target (per PRD §4) |
 |-----------------------------------|-------------------------------------------------------------------------------|---------------------|
@@ -1391,7 +1391,7 @@ exposes `--host`, `--port`, `--reload`.
 **Role.** [Rachel](PRD.md#1-the-user)'s surface. Two routes, two
 templates.
 
-_Source: FastAPI app in [`src/web_app.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py) (`queue` [L29](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L29), `audit` [L57](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L57), `post_action` [L72](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L72)); templates [`templates/queue.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/queue.html) + [`templates/audit.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/audit.html)._
+_Source: FastAPI app in [`src/web_app.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py) (`queue` [L76](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L76), `audit` [L105](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L105), `post_action` [L121](https://github.com/ngs2410/strata-build-challenge/blob/main/src/web_app.py#L121)); templates [`templates/queue.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/queue.html) + [`templates/audit.html`](https://github.com/ngs2410/strata-build-challenge/blob/main/templates/audit.html)._
 
 **v1.**
 - `src/web_app.py` FastAPI app:

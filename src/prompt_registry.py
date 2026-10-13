@@ -1,3 +1,26 @@
+'''Task-name → prompt-builder + response-model + stub registry.
+
+`PROMPT_REGISTRY` is the single lookup table that maps a task name (e.g.
+`'version_diff'`) to everything `ModelCaller` needs to dispatch it: the
+import path of the prompt builder, the Pydantic response class, a
+deterministic stub (used in cache-less tests and `--dry_run` mode), and the
+`task_model_configs` key where the model/token/effort hyperparameters live.
+
+The registry is populated once at module load. `resolve(module_name,
+function_name)` is a thin `importlib` + `getattr` helper so `ModelCaller`
+doesn't need direct imports of every task module — this breaks what would
+otherwise be a tangle of circular imports (every task imports its citation /
+mapping neighbor transitively via shared Pydantic models).
+
+Adding a new LLM task is a four-line insert here plus the three functions
+the entry points at: `build_<task>_prompt`, `<Task>Response`,
+`stub_<task>_response`. The CLAUDE.md "centralized flags" rule applies —
+if a caller supplies a task name, the registry supplies everything else.
+
+Current tasks: `version_diff`, `citation_verify`, `obligation_extraction`,
+`mapping`.
+'''
+
 import importlib
 from dataclasses import dataclass
 

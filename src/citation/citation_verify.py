@@ -1,3 +1,40 @@
+'''`citation_verify` LLM task — does the cited passage actually support the claim?
+
+Project depth area (two-step citation pattern), post-grounding verifier.
+`citation_grounding` locates the citing span deterministically; this module
+runs a semantic NLI-style check that confirms the cited span SUPPORTS the
+described change. The two steps are independent: grounding can find a span
+that doesn't semantically support the claim, and verification is the gate
+that catches it.
+
+Pipeline position: `verify_citations(changes, prior, final)` is called in
+`pipeline.run_pipeline` iff `DomainConfig.citation.verification_required ==
+True`. One LLM call per batch of changes (not per citation) — the prompt
+packs all changes with their cited passage text; the response is
+one `CitationVerificationItem` per change_id.
+
+Response merging:
+  * The LLM returns `prior_citation_verified` and `new_citation_verified`
+    as `bool | None` for each change — null means "no citation on this
+    side" (added or removed changes). `_apply_verification` writes
+    `verified` + `verification_rationale` back onto the existing
+    `Citation` via `model_copy(update=...)` — the citation's
+    `start_offset` / `end_offset` from grounding are preserved.
+  * Missing a verification entry for any change_id raises `ValueError` —
+    we never silently drop a change (CLAUDE.md fail-fast).
+  * A `verified=None` response for a non-null citation falls back to
+    `verified=False` with a diagnostic rationale — this is a verifier bug
+    we want visible, not a silent pass.
+
+The LLM is instructed to quote the specific supporting phrase in its
+rationale, so a reviewer scanning an "unverified" item can see WHY — not
+just that the verifier declined.
+
+`stub_citation_verify_response` returns `True` for every citation whose
+passage_id resolves — enough for StubBackend tests to exercise the merge
+path without an API call.
+'''
+
 from pydantic import BaseModel, ConfigDict
 
 from src.config import Change, Citation, ProceedingVersion

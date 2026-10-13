@@ -1,3 +1,22 @@
+'''Structlog configuration — JSON logs to stderr, one call at startup.
+
+`configure_logging()` is called exactly once per process (CLI entrypoint or
+FastAPI startup) and installs a `JSONRenderer` on both `structlog` and the
+stdlib `logging` root. Every subsequent `get_logger()` returns a bound
+structlog logger that emits structured events to stderr; stdout stays clean
+for program output.
+
+`LOG_LEVEL` is read from the environment with `DEFAULT_LOG_LEVEL = 'INFO'`.
+This is one of the few legitimate env-var reads in the codebase
+(CLAUDE.md "env-vs-config": platform/library-level knobs are OK; configuration
+belongs in bootstrap/`DomainConfig`). `.env` is loaded via `python-dotenv`
+at the top of `configure_logging` so a local run picks up developer-set
+levels without wrapping the CLI.
+
+v1 is structlog-to-stderr; OpenTelemetry collector + Grafana stack is a
+post-wedge addition if observability needs grow (CLAUDE.md).
+'''
+
 import logging
 import os
 import sys

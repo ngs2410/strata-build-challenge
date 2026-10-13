@@ -1,3 +1,32 @@
+'''Canonical data contracts and tenant-scoped domain config loader.
+
+Every entity in the pipeline — passages, proceeding versions, citations,
+changes, extracted obligations, company-side obligations/projects/documents,
+mappings, review items, audit events — is a Pydantic model defined here.
+`DomainConfig` and its sub-models (`EscalationConfig`, `MappingConfig`,
+`CitationConfig`, `TaskModelConfig`) are the per-tenant hyperparameter bundle.
+
+Enforced invariants:
+  * `extra='forbid'` on every model — unknown JSON keys raise, never silently
+    pass through. Stale data on disk fails loudly (CLAUDE.md: rebuild the
+    world, never add Pydantic defaults to accommodate old shapes).
+  * Categorical fields use `Literal[...]` — no bare `str`. Draft vs final is
+    `ProceedingVersion.status: Literal['draft', 'final']`, not a boolean
+    (Strata product invariant).
+  * `(tenant_id, environment)` lives on every tenant-scoped entity so the
+    `Store[T]` facade can enforce isolation at read/write time.
+  * Routing destination is single-valued today
+    (`Literal['market_ops', 'legal', 'it_metering']`); multi-destination
+    routing is deferred per TDD §8.6.
+
+`load_domain_config(tenant_id, environment)` is the single reader. It
+deep-merges `config/default_domain_config.json` with an optional per-tenant
+override at `data/tenants/<tenant>/<env>/domain_config.json`, then
+`DomainConfig.model_validate(merged)`. Callers that need config MUST route
+through this function — never open the JSON directly (CLAUDE.md
+encapsulation rule).
+'''
+
 from datetime import datetime
 from pathlib import Path
 from typing import Literal

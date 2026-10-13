@@ -58,7 +58,7 @@ tests/                              Pytest tests — test file naming: test_vers
 - Single quotes
 - ensure_ascii=false in json.dumps
 - absl flags for scripts
-- no doc_strings
+- no docstrings on functions or classes. **Module-level docstrings are the exception** — every file in `src/` and `scripts/` may start with a triple-quoted module docstring that explains, at staff-engineer level, what the module does, how it fits into the pipeline, and any non-obvious implementation details (invariants it enforces, caching behavior, failure modes, upstream/downstream contracts). Function and class behavior still goes in identifier names, not prose.
 - no 'magic' literals, create constants instead. For v1 we ship a single storage backend (JSON); when a second lands, backend selectors live in `src/stores.py` as `BACKEND_*` constants. Facade modules export a public `FACADE_NAME` constant at module top that other modules import (don't re-declare or hardcode).
 - don't add silent fallbacks — this includes `.get('foo', [])`, `x or ''`, `x or []`, `x | default`, `if x is None: x = default`. Use direct access `['key']` and let KeyError/TypeError propagate.
 - if a .get() default is intentional (boundary input, sparse config, optional field), mark the line with `# intentional default — <who writes this data and why the key may be absent>`. The comment MUST name the producer. If the producer is our own code, the default is WRONG — use direct access. Only boundary inputs from outside the system (user input, platform metadata, external APIs) qualify.

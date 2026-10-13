@@ -1,3 +1,21 @@
+'''Deterministic stub backend for the `stub://` scheme — the no-network path.
+
+Used by tests, `--dry_run` script invocations, and any environment where
+spending LLM budget is not wanted. The adapter looks up the per-task stub
+in `PROMPT_REGISTRY` (every registered task declares a
+`stub_module` / `stub_function` pair) and calls it with the same `params`
+dict a real backend would receive. Stubs return a fully constructed
+`<Task>Response` Pydantic instance.
+
+A tenant/env swaps to the stub backend by setting the task's
+`model_identifier` to `stub://...` in `DomainConfig.task_model_configs` —
+no code change required.
+
+The returned object is `isinstance`-checked against `response_type`; a
+mismatch raises `TypeError` immediately so a broken stub cannot pollute the
+diskcache with the wrong shape.
+'''
+
 from typing import TypeVar
 
 from pydantic import BaseModel

@@ -1,3 +1,41 @@
+'''OpenAI responses-API backend for `ModelCaller` — the `openai://` scheme.
+
+Thin adapter over the openai SDK's `client.responses.parse(...)`. Called only
+by `ModelCaller.call`; never from feature code directly. `matches` returns
+True iff the task's `model_identifier` starts with `openai://`; the suffix is
+the OpenAI model name (e.g. `openai://gpt-5.4-nano` → `gpt-5.4-nano`).
+
+Dispatch sends:
+  * `input`: the rendered prompt string from `params['input']`
+  * `text_format`: the Pydantic response class, so OpenAI returns a
+    structured object (CLAUDE.md: always use Structured Outputs; no field
+    validators).
+  * `max_output_tokens`, `reasoning.effort`, `text.verbosity` from
+    `TaskModelConfig`.
+
+Retry policy: exponential backoff on `RateLimitError`,
+`InternalServerError`, `APIConnectionError` only — never on auth or 4xx
+schema errors (which would just reproduce). `MAX_RETRIES = 3`,
+`INITIAL_BACKOFF_SECONDS = 1.0`, `BACKOFF_MULTIPLIER = 2.0`.
+
+Failure modes raised (never swallowed, per CLAUDE.md fail-fast rule):
+  * `response.status == 'incomplete'` → RuntimeError with
+    `incomplete_details` for debugging.
+  * `response.output_parsed is None` → RuntimeError, surfacing any refusal
+    text extracted from `response.output[0].content[0].refusal`.
+  * Retryable exceptions exhausted → the final exception propagates.
+
+Cost telemetry logged per call (`openai_backend.call`):
+`{task_name, model_name, input_tokens, output_tokens, estimated_cost_usd}`
+where the cost is computed from `_PRICING_USD_PER_1K_TOKENS` as `Decimal`
+(hard-pinned per model id — update when the frontier model changes). An
+unknown model logs `openai_backend.pricing_missing` and omits the cost
+field; it does not block the call. CLAUDE.md "explicit unit economics".
+
+The `OpenAI()` client is lazily constructed on first use so tests can inject
+a stub via `OpenAIBackend(client=...)`.
+'''
+
 import time
 from decimal import Decimal
 from typing import TypeVar

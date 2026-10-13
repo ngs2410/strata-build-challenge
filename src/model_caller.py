@@ -1,3 +1,43 @@
+'''Single chokepoint for every LLM call — dispatch, cache, retries, telemetry.
+
+`ModelCaller.call(task_name, params, response_type, call_spec, tenant_id,
+environment)` is the one entrypoint every caller uses. It loads
+`DomainConfig` for `(tenant_id, environment)`, looks up the
+`TaskModelConfig` for `task_name`, resolves the backend via the URL-scheme
+prefix (`openai://`, `jev://`, `stub://`), checks the diskcache, dispatches
+if miss, writes the parsed Pydantic result back to cache, and returns it.
+
+Backend facade (`Backend` Protocol): `matches(model_identifier) -> bool` +
+`call(...)`. Backends are tried in order and the first `matches` wins — the
+URL-scheme prefix is the full dispatch signal (CLAUDE.md: "dispatch by
+URL-scheme prefix goes through a facade ABC — never an inline
+if-startswith ladder in the caller"). Three concretes today: `StubBackend`
+(deterministic for tests + dry-runs), `OpenAIBackend` (real responses API),
+`JevBackend` (shell for TypeSafe AI, raises `NotImplementedError`).
+
+Cache contract (CLAUDE.md invariant — "the LLM cache is a valuable, paid-for
+asset"):
+  * Key is a plaintext JSON dict with sorted keys, NOT a hash. Any change
+    to the key shape or hashing requires explicit user approval (hashed
+    keys cannot be renamed in place and expensive calls would get repaid
+    for cosmetic changes).
+  * Key composition: `{model_identifier, max_tokens, reasoning_effort,
+    verbosity, response_type.__name__, params['input'], params['inputs_dict']}`.
+  * `.model_cache/` on disk (in `.gitignore`), diskcache-backed, replayable
+    with zero infra.
+
+`confirm_llm` support: when enabled, prints the fully rendered prompt +
+estimated token count + input summary to stdout and blocks for operator
+`y/n` before dispatching. A `--confirm_llm` CLI flag flips this on;
+`fan_out_for_task` concurrency behavior around confirm is TDD §4.1 and
+LLM-rules.
+
+The module exports a process-wide singleton `model_caller = ModelCaller()`
+so `from src.model_caller import model_caller` is the standard import.
+Call-site code must NEVER construct its own `OpenAI()` client or call the
+openai SDK directly (CLAUDE.md: no parallel integrations).
+'''
+
 from pathlib import Path
 from typing import Protocol, TypeVar, runtime_checkable
 

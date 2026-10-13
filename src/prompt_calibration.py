@@ -1,3 +1,27 @@
+'''Shared taxonomies and rubrics that every LLM prompt injects verbatim.
+
+Three reference blocks are built here once at import time and consumed by
+multiple prompts across the codebase (DRY — a single source of truth so
+`obligation_extraction` and `mapping` agree on what "operational" means):
+
+  * `OBLIGATION_TAXONOMY_REFERENCE` — the four `Obligation.obligation_type`
+    `Literal` values (reporting / operational / procedural / financial)
+    expanded into definitions + examples. Keeps the LLM aligned with the
+    `Literal` set on `Obligation` and `ExtractedObligation` in config.py.
+  * `CHANGE_TYPE_RUBRIC` — the five `Change.change_type` values
+    (added / removed / tightened / loosened / cosmetic) with definitions.
+  * `CONFIDENCE_LEVEL_RUBRIC` — the 0–5 integer self-report scale used by
+    every task that emits a `confidence` field, paired with the rule
+    "over-confidence is worse than under-confidence" so low-confidence
+    outputs reliably escalate (Strata invariant: the system fails to a
+    reviewer, not to a guess).
+
+The rubrics are built from source dicts (`OBLIGATION_TYPES`, `CHANGE_TYPES`,
+`CONFIDENCE_LEVELS`) so adding a value is a dict edit, not a prose rewrite.
+Any `Literal` list in config.py whose values appear here must be kept in
+sync — grep both files when adding a new type.
+'''
+
 OBLIGATION_TYPES: dict[str, dict[str, str]] = {
   'reporting': {
     'description': (

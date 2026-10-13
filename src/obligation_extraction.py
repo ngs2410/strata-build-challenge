@@ -1,3 +1,29 @@
+'''`obligation_extraction` LLM task — one `ProceedingVersion` → N obligations.
+
+Pipeline position: `extract_obligations(version)` is called once per
+version by `pipeline.run_pipeline`. Each returned `LlmExtractedObligation`
+carries an `LlmCitation(passage_id, citing_span)` that
+`citation.citation_grounding.ground_obligations` turns into a precise
+`Citation` by substring search within the cited passage. Grounding failures
+mark the citation unverified; `pipeline` then escalates downstream when
+`citation.verification_required=true`.
+
+Four `Literal` obligation types, injected into the prompt via
+`OBLIGATION_TAXONOMY_REFERENCE` from `prompt_calibration`:
+reporting / operational / procedural / financial. The taxonomy strings
+and the `Literal` set on `Obligation` and `ExtractedObligation` in
+config.py MUST stay in sync — grep both files when adding a type.
+
+The LLM returns `citing_span` as VERBATIM substring, never numeric offsets
+— the project's citation-grounding depth-area pattern. The system prompt
+and rubric both say "do not count characters or emit numeric offsets".
+
+`stub_obligation_extraction_response` returns one hand-constructed
+procedural obligation anchored to `version.passages[0]` — enough for
+`StubBackend` tests and dry-runs to exercise the grounding + verification
+chain without an LLM call.
+'''
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict

@@ -1,3 +1,49 @@
+'''Eval harness — gold-set schemas + scoring + aggregation + report rendering.
+
+Project depth area. Scores four stages against a hand-labeled gold set
+(`data/evals/gold.json`), aggregates per-case results, and emits either a
+text or markdown report. Pure functions; the orchestrator is
+`scripts/main_eval.py` which drives the pipeline then feeds its outputs
+here.
+
+Gold-set schema (all Pydantic `extra='forbid'`):
+  * `GoldSet.cases: tuple[GoldCase, ...]`
+  * `GoldCase.input` names the proceeding files; `expected_changes`,
+    `expected_verifications`, `expected_extractions`, `expected_mappings`
+    are the per-stage labels. Verifications/extractions/mappings are
+    optional per case (`None` = don't score that stage for this case).
+
+Matching strategy — triple-key alignment:
+Predicted and expected changes are keyed by
+`(change_type, prior_passage_position, new_passage_position)`. Positions
+come from the passage_id suffix (`p<N>` emitted by `ingest.py`). Matching
+is multiset-based (`_match_triples`): tp = per-key `min(pred, exp)`,
+fp/fn from the remainders. Keeps the harness independent of the LLM's
+arbitrary `change_id` strings — the test is "did we find the same
+semantic change in the same place?" not "did the id match?".
+
+Metrics computed per case (`CaseResult`):
+  * Change detection — tp/fp/fn, confusion matrix of `expected → predicted`
+    change_type pairs, citation hits/misses (position-pair match), mean
+    confidence, confidence-bucket reliability (predicted-confidence vs.
+    actual-correctness), keyword coverage in the description.
+  * Citation verify — accuracy of `verified` booleans against expected.
+  * Obligation extraction — precision/recall/F1 keyed by
+    `(version_id, passage_position)`, obligation_type accuracy, keyword
+    coverage.
+  * Mapping — item-level precision/recall/F1 (affected_items set compared
+    per entity type), action accuracy, routing-destination accuracy.
+
+`aggregate(results)` sums per-case counts into stage-wide
+precision/recall/F1, builds the reliability diagram, and renders a confusion
+dict. `render_text_report` is the stdout format;
+`render_markdown_report` is the GitHub-friendly format that pins the
+`(tenant, env, gold_file, generated_at)` provenance in frontmatter.
+
+CLAUDE.md "evaluation first": every ML/LLM component ships with its eval
+harness and gold data before it ships. This module is that harness.
+'''
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal

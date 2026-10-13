@@ -1,3 +1,31 @@
+'''CLI entrypoint — run the full eval harness against a gold set and print metrics.
+
+Drives `src.evals` end-to-end. For each `GoldCase` in `--gold_file`:
+builds a prior + final `ProceedingVersion` from the case's text files,
+runs `detect_changes → ground_citations_for_changes → verify_citations`,
+then (per case, if the case has expected labels for that stage) runs
+`extract_obligations → ground_obligations` and `map_change` and scores
+each stage against the gold labels via the `score_*` functions in
+`src.evals`.
+
+Output: text report to stdout always. JSON report to
+`<--output_dir>/<timestamp>.json` unless `--dry_run`. If `--md_output`
+is set, also writes a markdown report there — the committed-artifact
+format intended for the `make eval-report` target that pins
+`(tenant, env, gold_file, generated_at)` provenance in the frontmatter.
+
+Flags: standard set — `--tenant_id`, `--environment`, `--gold_file`,
+`--output_dir`, `--md_output`, `--dry_run`, `--k` (smoke-test on first K
+cases — real knob here, not a no-op), `--profile`, `--confirm_llm` (same
+semantics as `main_detect_changes.py` — plumbed into ModelCaller).
+
+Follows the CLAUDE.md "scripts are flags + a `_run` calling into the lib"
+split: `_build_version(case, which)` and `_run()` are the only
+script-local helpers; everything substantive lives in `src/evals.py`,
+`src/pipeline.py`, and the per-stage task modules. Tests MUST NOT import
+from this file (CLAUDE.md tests-import-scripts rule).
+'''
+
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path

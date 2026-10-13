@@ -1,3 +1,39 @@
+'''Review-queue state transitions — enqueue, approve/override/escalate.
+
+Two entry points:
+
+  * `enqueue_mapping(mapping, change, config)` — called by `pipeline` after
+    each `map_change`. Produces a `ReviewItem` whose `status` is `pending`
+    or `escalated` based on the escalation threshold. This is the "system
+    fails to a reviewer, not to a guess" invariant (Strata product
+    invariant): low-confidence outputs are never silently dropped and
+    never silently approved.
+
+  * `apply_action(tenant_id, environment, review_item_id, action, actor,
+    rationale)` — called by the FastAPI POST route when a reviewer
+    approves / overrides / escalates. Loads the current review items,
+    updates the matching one's status, writes back, and emits the
+    corresponding audit event (`review_item_approved` / `_overridden` /
+    `_escalated`) with both prior and new values. Rationale is required —
+    the audit log is the system of record.
+
+Escalation logic (`_escalation_threshold`):
+  * If any of the change's citations is unverified → use
+    `config.escalation.citation_threshold` (stricter — unverified evidence
+    is a red flag).
+  * Otherwise → use `config.escalation.mapping_threshold`.
+  * Both thresholds are tenant hyperparameters in `DomainConfig.escalation`.
+
+Priority is a simple product (`confidence * (1 + len(affected_items))`) —
+items with high-confidence mappings AND many affected items float to the
+top. v1 doesn't need a more sophisticated scoring function; swap it out via
+`_compute_priority` when queue triage becomes a real workflow.
+
+The `_ACTION_TO_STATUS` / `_ACTION_TO_EVENT_KIND` lookup tables are the
+canonical mapping — no inline string literals at call sites (CLAUDE.md
+"centralized lookup tables").
+'''
+
 from datetime import datetime, timezone
 from typing import Literal
 

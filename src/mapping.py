@@ -1,3 +1,39 @@
+'''`mapping` LLM task — one `Change` → the company items it affects + action + route.
+
+Pipeline position: `map_change(change, obligations, projects, documents)`
+is called once per Change by `pipeline.run_pipeline`. One LLM call per
+change (v1 scale: ~5 changes per end-to-end run). Returns a fully-formed
+`Mapping` with: `affected_items`, `recommended_action`
+(review/amend/no_op), `routing_destination`
+(market_ops/legal/it_metering), `confidence`, and the free-text
+`rationale`.
+
+Index-based item selection (hallucination guard):
+The LLM is asked for `AffectedItemByIndex(item_type, item_index, ...)` —
+NOT the item id string. Candidate lists in the prompt are numbered
+`[0]`, `[1]`, …, and the LLM picks indices. `_resolve_affected_item`
+translates each index into the real `obligation_id` / `project_id` /
+`document_id`. This design makes "the LLM invented an id that isn't in the
+company context" structurally impossible — the index would be out of
+range and raise. See PROMPT_CONVENTIONS.md "list-index selection".
+
+Candidate-set size is a `DomainConfig.mapping.candidate_set_size`
+hyperparameter — v1 fits the whole context in one call (~16 items). When
+the company context exceeds ~200 items the mapping stage splits into the
+three paths in TDD §3.6; the facade stays `map_change(change, obligations,
+projects, documents)`.
+
+Routing destination is intentionally single-valued in v1
+(`Literal['market_ops', 'legal', 'it_metering']`). Multi-destination
+routing is open-question TDD §8.6 — the LLM picks ONE primary team. The
+prompt says this explicitly.
+
+`stub_mapping_response` applies three naive filters (source_authority
+substring match, obligation→project transitive hit, DER-in-title match)
+plus a simple change_type→routing/action lookup. Enough for StubBackend
+tests to exercise the index-resolution path without an API call.
+'''
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict

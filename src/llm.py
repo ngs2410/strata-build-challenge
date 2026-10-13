@@ -1,3 +1,31 @@
+'''Prompt-authoring primitives: `PromptSpec`, `CallSpec`, and `INPUT_LABELS`.
+
+Every LLM task in Strata builds a `PromptSpec` and hands it to `ModelCaller`
+alongside a `CallSpec`. This module defines both. See PROMPT_CONVENTIONS.md
+for the full authoring guide — this docstring covers mechanics, not style.
+
+`PromptSpec` (frozen dataclass) holds the full prompt as structured sections:
+system_prompt, task (required), optional steps / details / rubrics /
+pitfalls / field_intents / json_example, plus `inputs_dict` for the
+run-specific inputs. `render(included_inputs)` returns a
+`(system_prompt, user_message)` tuple. Section headings are hard-coded
+(`## Task`, `## Steps`, …) so prompt structure is consistent across every
+task.
+
+`included_inputs` filters `inputs_dict` by key — set per
+`TaskModelConfig.included_inputs` so each task controls which inputs it
+actually injects. Keys not in `INPUT_LABELS` raise `KeyError` at render time
+(no silent fallback) — register the label here when adding a new input.
+
+`CallSpec` is the authoring intent: purpose, acceptance_criteria,
+failure_modes. It is NOT a runtime config object; it is a review artefact
+that every prompt author fills in so prompt diffs come with reviewer
+context (CLAUDE.md: "every model call has a purpose, acceptance criteria,
+and known failure modes").
+
+Both specs are `frozen=True` — mutate by constructing a new instance.
+'''
+
 from dataclasses import dataclass, field
 
 INPUT_LABELS: dict[str, str] = {

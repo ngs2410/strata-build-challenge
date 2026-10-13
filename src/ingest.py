@@ -1,3 +1,34 @@
+r'''Load proceeding text files + the company-context seed into Pydantic models.
+
+Entry point: `ingest_tenant_fixture(tenant_id, environment)` — reads
+`data/tenants/<tenant>/proceedings/manifest.json`, walks each entry's
+`text_file`, parses it into `Passage`-level chunks, and also loads
+`company_context.json` for the tenant's obligations/projects/documents.
+`persist_ingest(...)` is a separate step so callers can inspect the parsed
+models in dry-run before writing to the stores (CLAUDE.md "I/O and pure
+functions separately").
+
+Passage parsing is deterministic:
+  * Text is split on blank lines (`\n\n`); each non-empty paragraph is one
+    passage.
+  * Section-header lines matching `^§([\d.]+)(\([^)]+\))*` set the current
+    `section_path` tuple and reset `position` to 0. Trailing `(A)(1)(i)`
+    style subsections become additional path elements.
+  * `passage_id = '<proceeding_id>:<version_id>:§<base>(sub1)(sub2):p<pos>'`
+    — stable across runs for the same text, which is critical for the
+    citation-grounding substring step downstream (if the text doesn't
+    change, the id doesn't change).
+
+Isolation: `company_context.json` lives at the TENANT root, not under an
+environment subdir — the seed is shared across the tenant's environments.
+Proceeding fixtures live under the tenant root for the same reason. All
+derived artefacts (parsed ProceedingVersions, downstream changes, mappings)
+land under `data/tenants/<tenant>/<env>/` per the stores facade.
+
+Fail-fast: Pydantic validation errors on malformed company_context JSON
+propagate (CLAUDE.md: never add defaults to accommodate stale data).
+'''
+
 import re
 from datetime import datetime
 from pathlib import Path

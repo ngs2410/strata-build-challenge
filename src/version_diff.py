@@ -1,3 +1,43 @@
+'''`version_diff` LLM task — detect material changes between draft and final.
+
+Pipeline position: draft (NOPR) + final `ProceedingVersion` in → list of
+`LlmChange` out, one per material change. Downstream, `citation_grounding`
+turns each `LlmCitation(passage_id, citing_span)` into a precise
+`Citation(passage_id, start_offset, end_offset, verified, …)` by substring
+search; `citation_verify` then runs the NLI check that confirms the cited
+span supports the stated change.
+
+The call chain is: `detect_changes(prior, final)` →
+`build_version_diff_prompt` → `model_caller.call(task_name='version_diff',
+...)` → `VersionDiffResponse(changes: tuple[LlmChange, ...])`.
+
+Enforced input invariants (raise before dispatching, no silent coercion):
+  * `prior.proceeding_id == final.proceeding_id`
+  * `prior.tenant_id == final.tenant_id` and same environment
+  * `prior.status == 'draft'` and `final.status == 'final'` — draft-vs-final
+    is a `Literal`, not a boolean (Strata product invariant).
+
+Prompt shape (see PROMPT_CONVENTIONS.md for the authoring guide):
+  * Includes `CHANGE_TYPE_RUBRIC` + `CONFIDENCE_LEVEL_RUBRIC` from
+    `prompt_calibration` so the model emits only the five Literal
+    change_type values and the 0-5 confidence rubric.
+  * The LLM returns `LlmCitation(passage_id, citing_span)` — a VERBATIM
+    text substring copied from the cited passage — NOT numeric offsets.
+    Offsets are computed deterministically in Python by
+    `citation_grounding` to avoid LLM miscount errors (the two-step
+    citation pattern — the project's depth area).
+  * `prior_citation` is null for `added`; `new_citation` is null for
+    `removed`. The three branches have their own JSON examples in the
+    prompt.
+
+`stub_version_diff_response` returns three hand-constructed changes
+tailored to the Order 2222 NOPR→Final sample — used by `StubBackend` so
+tests and `--dry_run` exercise the end-to-end wiring without an API call.
+
+`VERSION_DIFF_SPEC` is the review-time `CallSpec` naming purpose, acceptance
+criteria, and known failure modes.
+'''
+
 from datetime import datetime, timezone
 from typing import Literal
 

@@ -1,3 +1,29 @@
+'''CLI entrypoint — run the end-to-end detection pipeline for a tenant/env.
+
+Thin wrapper over `src.pipeline.run_pipeline`. Keeps the script skeleton
+small (CLAUDE.md "scripts are flags + a `_run` calling into the lib")
+precisely so tests NEVER import this file — module-level `absl` flags
+would pollute the global `FLAGS` namespace and break any test that
+re-parses flags. The pipeline library lives in `src/pipeline.py`;
+callers that want to drive the pipeline from code import that.
+
+Flags:
+  * `--tenant_id` / `--environment` — the usual isolation pair, defaults
+    to the demo tenant.
+  * `--dry_run` — compute every stage (including LLM calls so the cache
+    fills) but do not persist artefacts or append audit events.
+  * `--k` — smoke-test knob; currently no-op in the stub harness
+    (CLAUDE.md requires every script to expose `--k` even when the stage
+    doesn't yet exercise it).
+  * `--profile` — wrap `_run()` in `cProfile`, print top-50 cumulative
+    time functions. The output is a performance snapshot, not a prod
+    telemetry signal.
+  * `--confirm_llm` — forwarded straight into `ModelCaller` so every
+    dispatch prints the rendered prompt + estimated tokens and blocks
+    for operator `y/n`. Does NOT force `n_jobs=1` (TDD §4.1 — fan-out
+    semantics around confirm are handled inside ModelCaller).
+'''
+
 from absl import app, flags
 
 from src.model_caller import model_caller

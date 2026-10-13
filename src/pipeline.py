@@ -1,3 +1,48 @@
+'''End-to-end pipeline orchestrator — ingest → diff → ground → verify → extract → map → enqueue.
+
+`run_pipeline(tenant_id, environment, dry_run=False)` runs every stage in
+order and returns a `PipelineResult` with the fully populated artefacts.
+This is the one orchestration surface — scripts and tests both drive the
+pipeline through this function; neither constructs stages ad hoc.
+
+Stages, in order (one `logger.info('<stage>.start' / .done', ...)` pair
+per stage):
+
+  1. **Ingest** — `ingest_tenant_fixture` parses the proceeding text files
+     + company_context seed into Pydantic models; `persist_ingest` writes
+     them to the stores.
+  2. **Diff** — `detect_changes(prior, final)` runs the `version_diff` LLM
+     task; `ground_citations_for_changes` substring-matches each
+     `LlmCitation(citing_span)` to compute `(start_offset, end_offset)` on
+     the real passage text.
+  3. **Verify (optional)** — if `DomainConfig.citation.verification_required`
+     is true, `verify_citations` runs the `citation_verify` LLM task over
+     every grounded citation and sets `verified` + `verification_rationale`.
+     Skipped when false (logged).
+  4. **Extract** — `extract_obligations(version)` once per version; results
+     are grounded by `ground_obligations`.
+  5. **Map** — `map_change(c, obligations, projects, documents)` once per
+     change. Sequential loop at v1 scale (~5 changes); CLAUDE.md
+     fan-out-at-scale rule says refactor to `fan_out_for_task` only when
+     cardinality crosses ~100.
+  6. **Enqueue** — `enqueue_mapping(m, change, config)` applies the
+     `EscalationConfig` thresholds (mapping confidence AND citation
+     confidence) and creates a `ReviewItem` with status `pending` or
+     `escalated`. The system fails to a reviewer, not to a guess (Strata
+     invariant).
+
+Audit discipline: every produced artefact (version, change, mapping,
+review_item) is appended to the audit log via `log_event(...)` — the
+JSONL append-only log is the system of record, and current state is a
+fold over it (Strata product invariant).
+
+Dry-run contract: `dry_run=True` runs every stage AND makes every LLM
+call (so the diskcache fills and operators can inspect prompts via
+`--confirm_llm`), but DOES NOT persist any artefact and does NOT write
+audit events. The in-memory `PipelineResult` is still returned so callers
+can inspect.
+'''
+
 from dataclasses import dataclass, field
 
 from src.audit_log import log_event

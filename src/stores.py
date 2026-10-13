@@ -1,3 +1,38 @@
+'''Persistence facade — `Store[T]` ABC plus the JSON/JSONL v1 concretes.
+
+Every tenant-scoped entity (proceedings, obligations, projects, documents,
+changes, extracted obligations, mappings, review items, audit events) has a
+typed `Store` singleton exported at the bottom of this module. Call-site
+code imports `from src.stores import <name>_store` and calls
+`store.load_all(tenant_id, environment)` / `.save_all(tenant_id,
+environment, items)` — the facade is the only legitimate path to tenant
+data on disk.
+
+Two shapes:
+  * `JsonStore[T]` — one JSON file per `(tenant, env, entity)`, fully
+    rewritten on `save_all`. Used for everything whose canonical shape is a
+    list to iterate (proceedings, mappings, review items, …). Load is a
+    full `orjson.loads` + per-item `model_validate` — stale on-disk shapes
+    fail Pydantic validation loudly (CLAUDE.md: rebuild the world, never
+    add defaults).
+  * `JsonlStore[T]` — one JSONL file, line-per-event, `append`-only. Used
+    for the audit log; the append-only shape is a product invariant
+    ("project state is a fold over an append-only audit log, not a mutable
+    column"). `load_all` reads the whole file; the fold-to-current-state
+    projection lives in `src/audit_log.py`.
+
+File layout: `data/tenants/<tenant_id>/<environment>/<filename>`. The
+`(tenant_id, environment)` directory IS the isolation boundary in v1
+(filesystem-level), per TDD §4.5. Postgres with row-level security is the
+production shape; a `PostgresStore[T]` concrete is a drop-in since
+callers already go through the ABC.
+
+Backend selection: when a second concrete lands, pick it in this module
+behind the `BACKEND_*` constants (CLAUDE.md: "backend selectors live in
+`src/stores.py`"). Never reach around the facade with raw
+`orjson.loads(open(...))` from a feature module.
+'''
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Generic, TypeVar

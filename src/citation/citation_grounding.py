@@ -1,3 +1,40 @@
+'''Grounding step — deterministic substring match from `LlmCitation` to `Citation`.
+
+Project depth area (two-step citation pattern): the LLM emits verbatim
+`citing_span` text, this module turns it into precise `(start_offset,
+end_offset)` by `passage.text.find(citing_span)`. No fuzzy matching, no
+re-anchoring, no LLM round-trip. Counting characters is an LLM failure
+mode so Python does it.
+
+Two entry points:
+  * `ground_citations_for_changes(llm_changes, prior, final)` — grounds
+    both prior and new citations against the merged passage dict from BOTH
+    versions (change citations can point into either). Returns fully-formed
+    `Change` objects.
+  * `ground_obligations(llm_obligations, version)` — grounds a single
+    citation per obligation against the single version. Raises if an
+    obligation has no citation (Strata product invariant: every claim is
+    cited).
+
+Failure cases (returned as `verified=False` with a specific
+`verification_rationale`, not raised — these are legitimate "unverified,
+needs reviewer" outcomes that `citation_verify` + the escalation threshold
+handle downstream):
+  * `citing_span` shorter than
+    `DomainConfig.citation.min_citation_span_chars` — too thin to be a
+    useful anchor; marked unverified with rationale.
+  * `passage.text.find(citing_span)` returns -1 — the LLM paraphrased or
+    truncated. Marked unverified with rationale.
+  * Successful grounding sets `verified=False` with rationale
+    `'pending citation_verify stage'` — the `citation_verify` LLM task
+    flips this to `True`/`False` based on whether the cited span actually
+    supports the stated change.
+
+Hard failure (raises `ValueError`):
+  * `passage_id` not found in any passed version — the LLM invented an id.
+    This is a prompt-engineering bug, not a run-time data issue.
+'''
+
 from src.citation.llm_citation import LlmCitation
 from src.config import (
   Change,

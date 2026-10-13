@@ -1,3 +1,19 @@
+'''Jev (TypeSafe AI) backend placeholder for the `jev://` scheme.
+
+v1 is intentionally a shell — `call()` raises `NotImplementedError`.
+`matches()` is wired so a `jev://`-prefixed `model_identifier` dispatches
+here rather than silently falling through to another backend; the raise
+makes "did someone enable jev before the adapter landed?" visible.
+
+A follow-up commit will replace the raise with Jev typed-decision dispatch
+(Noul / Choice / Score — see JEV.md). Likely intermediate step: LLM-emulate
+via OpenAI with Jev-shaped prompts so discrimination tasks
+(`citation_verify`, `change_type_classify`, routing, action recommendation)
+can run against the Jev seam before the real TypeSafe AI client is adopted.
+Per TDD §4.1 the migration is a `pip install typesafe-sdk` + one import
+flip; call sites stay backend-agnostic (they only know `jev://`).
+'''
+
 from typing import TypeVar
 
 from pydantic import BaseModel

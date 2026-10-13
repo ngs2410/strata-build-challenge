@@ -151,3 +151,76 @@ def test_cache_key_changes_with_input(verdant_grid_seeded, isolated_model_cache)
       environment='prod',
     )
   assert len(list(caller._cache.iterkeys())) == 2
+
+
+def test_confirm_llm_prompts_and_proceeds_on_blank_input(
+  verdant_grid_seeded, isolated_model_cache, monkeypatch, capsys
+):
+  del verdant_grid_seeded
+  caller = ModelCaller(cache_dir=isolated_model_cache, confirm_llm=True)
+  monkeypatch.setattr('builtins.input', lambda _prompt='': '')
+  prior, final = _versions()
+  response = caller.call(
+    task_name='version_diff',
+    params={
+      'input': [{'role': 'user', 'content': 'confirm-test'}],
+      'inputs_dict': {'passage_text': 'short passage'},
+      'prior': prior,
+      'final': final,
+    },
+    response_type=VersionDiffResponse,
+    call_spec=_CALL_SPEC,
+    tenant_id='verdant_grid',
+    environment='prod',
+  )
+  assert isinstance(response, VersionDiffResponse)
+  stdout = capsys.readouterr().out
+  assert '[model_caller] task=version_diff' in stdout
+  assert 'estimated_tokens=' in stdout
+  assert 'Passage text=' in stdout  # the INPUT_LABELS mapping for passage_text
+
+
+def test_confirm_llm_prompts_and_proceeds_on_lowercase_y(
+  verdant_grid_seeded, isolated_model_cache, monkeypatch
+):
+  del verdant_grid_seeded
+  caller = ModelCaller(cache_dir=isolated_model_cache, confirm_llm=True)
+  monkeypatch.setattr('builtins.input', lambda _prompt='': 'y')
+  prior, final = _versions()
+  response = caller.call(
+    task_name='version_diff',
+    params={
+      'input': [{'role': 'user', 'content': 'confirm-y'}],
+      'inputs_dict': {},
+      'prior': prior,
+      'final': final,
+    },
+    response_type=VersionDiffResponse,
+    call_spec=_CALL_SPEC,
+    tenant_id='verdant_grid',
+    environment='prod',
+  )
+  assert isinstance(response, VersionDiffResponse)
+
+
+def test_confirm_llm_raises_runtime_error_on_decline(
+  verdant_grid_seeded, isolated_model_cache, monkeypatch
+):
+  del verdant_grid_seeded
+  caller = ModelCaller(cache_dir=isolated_model_cache, confirm_llm=True)
+  monkeypatch.setattr('builtins.input', lambda _prompt='': 'n')
+  prior, final = _versions()
+  with pytest.raises(RuntimeError, match='declined version_diff'):
+    caller.call(
+      task_name='version_diff',
+      params={
+        'input': [{'role': 'user', 'content': 'confirm-n'}],
+        'inputs_dict': {},
+        'prior': prior,
+        'final': final,
+      },
+      response_type=VersionDiffResponse,
+      call_spec=_CALL_SPEC,
+      tenant_id='verdant_grid',
+      environment='prod',
+    )

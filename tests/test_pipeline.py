@@ -8,7 +8,7 @@ from src.citation.citation_grounding import (
   ground_citations_for_changes,
   ground_obligations,
 )
-from src.citation.citation_verify import verify_citations
+from src.citation.citation_verify import build_citation_verify_prompt, verify_citations
 from src.citation.llm_citation import LlmCitation
 from src.config import (
   AffectedItem,
@@ -302,6 +302,31 @@ def test_verify_citations_short_circuits_when_no_change_has_pending_citation():
   assert verified[0].new_citation.verification_rationale == (
     GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
   )
+
+
+def test_citation_verify_prompt_does_not_leak_structural_metadata():
+  # The verifier only needs passage text + citing span + the described
+  # shift. Rendering passage_id strings or integer offsets is noise that
+  # the LLM can only misread (and we moved away from exposing passage_id
+  # to the version_diff LLM for the same reason).
+  nopr = _version('draft', 'nopr')
+  final = _version('final', 'final')
+  citation = Citation(
+    passage_id='proc:nopr:§1:p1',
+    start_offset=0,
+    end_offset=29,
+    verified=False,
+    verification_rationale=GROUNDING_PENDING_RATIONALE,
+  )
+  prompt = build_citation_verify_prompt(
+    [_change('tightened', prior_citation=citation)], nopr, final
+  )
+  _, user = prompt.render()
+  assert 'proc:nopr:§1:p1' not in user
+  assert 'passage_id=' not in user
+  assert 'offsets ' not in user
+  assert 'passage text:' in user
+  assert 'citing span:' in user
 
 
 def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side():

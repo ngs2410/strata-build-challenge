@@ -250,14 +250,13 @@ def _render_citation(label: str, citation: Citation | None, passages_by_id: dict
     return f'{label}_citation: null'
   passage = passages_by_id.get(citation.passage_id)
   if passage is None:
-    return (
-      f'{label}_citation: passage_id={citation.passage_id} '
-      f'(passage text unavailable — passage_id not found in either version)'
+    raise ValueError(
+      f'citation_verify: cited passage_id={citation.passage_id} not found '
+      f'in either version — grounding should have raised earlier'
     )
   span = passage.text[citation.start_offset : citation.end_offset]
   return (
-    f'{label}_citation (passage_id={citation.passage_id}, '
-    f'offsets {citation.start_offset}-{citation.end_offset}):\n'
+    f'{label}_citation:\n'
     f'  passage text: "{passage.text}"\n'
     f'  citing span: "{span}"'
   )

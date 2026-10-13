@@ -784,12 +784,13 @@ cost telemetry, backend selection.
   `{model_identifier, max_tokens, reasoning_effort, verbosity,
   response_type, input, inputs_dict}`. Cache dir `.model_cache/`,
   in `.gitignore`.
-- **Fan-out**: a `fan_out_for_task(...)` helper is reserved on the
-  `ModelCaller` surface for future work. v1 cardinality is <20
-  everywhere, so every call site uses the sequential
-  `for item in items: model_caller.call(...)` form. The fan-out
-  helper lands when a stage's cardinality crosses ~100 (per
-  CLAUDE.md). It is NOT present in v1.
+- **Fan-out**: NOT shipped in v1. v1 cardinality is <20 everywhere,
+  so every call site uses the sequential
+  `for item in items: model_caller.call(...)` form. Fan-out helper
+  (`fan_out_for_task(...)` or an equivalent) lands when a stage's
+  cardinality crosses ~100 (per CLAUDE.md's sequential-at-v1-scale
+  rule) — likely the hierarchical diff in §3.2 or the two-stage
+  extraction in §3.5.
 - **Retry**: exponential backoff on 429 / 5xx with max 3 retries
   inside `openai_backend.OpenAIBackend.call`.
 - **Cost telemetry**: every call logs `{task_name, model_name,

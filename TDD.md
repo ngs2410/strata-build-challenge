@@ -47,7 +47,7 @@ shape Jev is architected for.
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
 │                              Operator (CLI)                                │
-│  main_ingest.py │ main_detect_changes.py │ main_eval.py │ main_review.py  │
+│      main_detect_changes.py   │   main_eval.py   │   main_review.py        │
 └──────┬──────────────────────────────────────────────────────┬─────────────┘
        │                                                      │
        ▼                                                      ▼
@@ -750,30 +750,39 @@ is replay-to-timestamp.
 cost telemetry, backend selection.
 
 **v1.**
-- `src/model_caller.py::ModelCaller.call(task_name, task_config, params,
-  response_type, call_spec, tenant_id, environment)` is the one entry
-  point.
-- Dispatches to OpenAI (via the `openai` SDK's responses API with
-  structured outputs) when `task_config.backend_type == 'openai'`.
-- Dispatches to Jev when `task_config.backend_type == 'jev'`. In v1 the
-  Jev adapter (`src/jev_adapter.py`) is **not yet wired to the real Jev
-  API** — it's an LLM-emulated stub that calls OpenAI with a prompt
-  tightly matched to Jev's typed-decision shape (Noul: "answer only yes
-  or no with a probability"; Choice: "pick exactly one option, return
-  the full distribution"; Score: "pick a rubric level, return the
-  distribution"). The response shape mirrors Jev's `answers` object
-  (JEV.md §4). The seam is reserved so migration is a single file.
-- **Diskcache** key is a plaintext JSON dict: `{model, prompt,
-  response_type, max_tokens, tool_use, backend_type}`. Cache dir
-  `.model_cache/`, in `.gitignore`.
-- **Fan-out**: `fan_out_for_task(task_config, items, process_item)`
-  exists but is only used at >100 items (per CLAUDE.md). v1 cardinality
-  is <20 everywhere, so most call sites use sequential
-  `for item in items: model_caller.call(...)`.
-- **Retry**: exponential backoff on 429 / 5xx with max 3 retries.
-- **Cost telemetry**: every call logs `{task_name, model_id,
-  backend_type, input_tokens, output_tokens, estimated_cost_usd,
-  tenant_id}` via structlog.
+- `src/model_caller.py::ModelCaller.call(task_name, params, response_type,
+  call_spec, tenant_id, environment)` is the one entry point. It reads
+  `task_config = load_domain_config(tenant_id, environment)
+  .task_model_configs[task_name]` and dispatches based on
+  `task_config.model_identifier`.
+- **Backend dispatch is URL-prefix on `model_identifier`.** Each backend
+  implements `Backend.matches(model_identifier) -> bool` + `Backend.call(...)`.
+  Three backends are registered in v1: `openai://<model-name>` →
+  `src/backends/openai_backend.py` (dispatches via the OpenAI responses
+  API with structured outputs); `jev://<model-name>` →
+  `src/backends/jev_backend.py` (a NotImplementedError shell in v1 —
+  the seam is reserved for the real Jev client, which lands via a
+  follow-up that LLM-emulates Noul / Choice / Score behind the same
+  prefix before the real TypeSafe AI client replaces the emulation);
+  `stub://<task-name>` → `src/backends/stub_backend.py` (routes to a
+  task-specific stub function via `PROMPT_REGISTRY`; used by tests and
+  by `--dry_run`). The `Backend.matches` facade keeps call sites
+  backend-agnostic — adding a provider is a new matcher, not an
+  edit at every call site (per CLAUDE.md's facade-dispatch rule).
+- **Diskcache** key is a plaintext JSON dict:
+  `{model_identifier, max_tokens, reasoning_effort, verbosity,
+  response_type, input, inputs_dict}`. Cache dir `.model_cache/`,
+  in `.gitignore`.
+- **Fan-out**: a `fan_out_for_task(...)` helper is reserved on the
+  `ModelCaller` surface for future work. v1 cardinality is <20
+  everywhere, so every call site uses the sequential
+  `for item in items: model_caller.call(...)` form. The fan-out
+  helper lands when a stage's cardinality crosses ~100 (per
+  CLAUDE.md). It is NOT present in v1.
+- **Retry**: exponential backoff on 429 / 5xx with max 3 retries
+  inside `openai_backend.OpenAIBackend.call`.
+- **Cost telemetry**: every call logs `{task_name, model_name,
+  input_tokens, output_tokens, estimated_cost_usd}` via structlog.
 
 **Production.**
 - Adopt `fan_out_for_task` at every stage whose cardinality crosses 100.
@@ -783,35 +792,39 @@ cost telemetry, backend selection.
 - Replace Jev stub with real client (`typesafe-sdk`'s
   `POST /v1/systemone`).
 
-**Future (tenant-driven, post-wedge).** The existing `backend_type`
-discrimination on `TaskModelConfig` reserves the seam; wiring BYO is
+**Future (tenant-driven, post-wedge).** The existing URL-prefix dispatch
+on `TaskModelConfig.model_identifier` reserves the seam; wiring BYO is
 additive, not a redesign. Preserves the CLAUDE.md "no irreversible
 vendor dependencies" principle.
-- **Tenant-supplied API keys** via `DomainConfig`, resolved through the
-  existing `secret://env/...` indirection or a prod-time secret manager.
+- **Tenant-supplied API keys** via `DomainConfig`, resolved through a
+  `secret://env/...` indirection or a prod-time secret manager.
   Per-tenant cost accounting already implies per-tenant key accounting;
   BYO keys shifts the cost line to the tenant.
 - **Alternative providers** (Anthropic, Google, self-hosted vLLM,
-  on-prem endpoints) via new `backend_type` values on `TaskModelConfig`
-  plus matching `ModelCaller` adapters alongside the current `openai` /
-  `jev` adapters. Call sites stay backend-agnostic.
-- **Tenant-owned fine-tuned models** via a tenant-scoped `model_id`
-  reference resolved by the selected backend adapter — no changes to
-  task-level call sites.
+  on-prem endpoints) land as new URL prefixes (e.g.
+  `anthropic://claude-opus-4-7`, `vllm://local-llama3`) with matching
+  `Backend` matchers alongside the current `openai://` / `jev://` /
+  `stub://` adapters. Call sites stay backend-agnostic.
+- **Tenant-owned fine-tuned models** are a different `<model-name>`
+  suffix behind the chosen prefix — no changes to task-level call
+  sites.
 
 **Decisions.**
 - **One chokepoint for all AI dispatch (OpenAI + Jev).** Caching,
   retries, cost telemetry, and structured-output discipline all live in
-  one place. Call sites stay backend-agnostic (`task_config` names the
-  backend). Direct SDK calls scattered through the codebase would
-  duplicate every one of these concerns and prevent swapping backends.
+  one place. Call sites stay backend-agnostic — they name only the
+  `task_name`; `ModelCaller` looks up `TaskModelConfig` and routes by
+  `model_identifier` prefix. Direct SDK calls scattered through the
+  codebase would duplicate every one of these concerns and prevent
+  swapping backends.
 - **Jev-shaped seam at every discrimination point, even before the real
-  Jev is wired.** v1 ships `backend_type: Literal['openai', 'jev']` in
-  `TaskModelConfig`; discrimination tasks (`verify_citation`,
-  `change_type_classify`, `route_destination`, `action_recommend`) have
-  `backend_type: 'jev'`; the Jev adapter LLM-emulates until the real
-  client arrives. Migration is `pip install typesafe-sdk` + flip one
-  import.
+  Jev is wired.** v1 ships `jev://` as a registered prefix in
+  `ModelCaller`; the `JevBackend` matcher raises `NotImplementedError`
+  until the follow-up commit lands LLM-emulated Noul / Choice / Score.
+  Discrimination tasks (`verify_citation`, `change_type_classify`,
+  `route_destination`, `action_recommend`) will flip to `jev://...`
+  model identifiers at that point. The real client migration is `pip
+  install typesafe-sdk` + swap the matcher's inner call.
 - **Plaintext JSON cache keys** (CLAUDE.md). Hashed keys are
   unrenamable; expensive LLM calls get repaid for a cosmetic rename.
 - **Diskcache over Redis.** Local, replayable, zero infrastructure.

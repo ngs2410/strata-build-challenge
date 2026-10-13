@@ -104,7 +104,7 @@ env3.12/bin/pytest tests/
 The suite is network-free (an autouse fixture in
 [`tests/conftest.py`](tests/conftest.py) rewrites every LLM task to a
 local [`stub://` backend](src/backends/stub_backend.py)) and runs in
-about 1.5 seconds. Expect 122 tests to pass. Test authoring rules
+about 1.5 seconds. Expect 124 tests to pass. Test authoring rules
 live in [TEST_QUALITY.md](TEST_QUALITY.md).
 
 Also useful:
@@ -227,8 +227,8 @@ Script flags: all the main_detect_changes flags above plus
 ## Project layout
 
 Top-level directories: [`src/`](src), [`config/`](config),
-[`data/`](data), [`templates/`](templates), [`scripts/`](scripts),
-[`tests/`](tests). Entry points to open first:
+[`data/`](data), [`templates/`](templates), [`static/`](static),
+[`scripts/`](scripts), [`tests/`](tests). Entry points to open first:
 [`src/pipeline.py`](src/pipeline.py) (orchestrator),
 [`src/config.py`](src/config.py) (every Pydantic model),
 [`src/model_caller.py`](src/model_caller.py) (LLM dispatch chokepoint).
@@ -247,7 +247,7 @@ src/                          Library code
   mapping.py                  LLM task: map changes to internal state
   review_queue.py             ReviewItem construction + apply_action
   audit_log.py                Append-only JSONL audit log
-  web_app.py                  FastAPI app (/queue + /audit)
+  web_app.py                  FastAPI app (/queue + /audit + /static mount)
   model_caller.py             ModelCaller facade (openai / jev / stub)
   prompt_calibration.py       Shared rubric constants + taxonomies
   evals.py                    Eval harness (depth area)
@@ -262,7 +262,12 @@ config/
 data/
   tenants/verdant_grid/       FERC Order 2222 excerpts + company context
   evals/gold.json             Hand-labelled gold set
-templates/                    Jinja2 templates (queue.html, audit.html)
+templates/
+  _base.html                  Shared layout (sidebar, breadcrumb, slots)
+  queue.html                  Review-queue page (extends _base.html)
+  audit.html                  Audit-log page (extends _base.html)
+static/
+  strata.css                  Review UI stylesheet
 scripts/                      CLI entry points (main_*.py)
 tests/                        Pytest tests (network-free; stub backend)
 ```

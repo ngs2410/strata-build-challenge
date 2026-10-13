@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Strata{% endblock %}</title>
+  <link rel="stylesheet" href="/static/strata.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="wordmark">Strata</span>
+        <span class="version">v1</span>
+      </div>
+      <div class="sidebar-context">
+        <div class="context-row">
+          <span class="context-label">Workspace</span>
+          <span class="context-value">{{tenant_id}}</span>
+        </div>
+        <div class="context-row">
+          <span class="context-label">Environment</span>
+          <span class="context-value">{{environment}}</span>
+        </div>
+      </div>
+      <div class="sidebar-group">
+        <div class="sidebar-group-title">Current Workspace</div>
+        <nav class="sidebar-nav">
+          <a href="/queue?tenant_id={{tenant_id}}&environment={{environment}}"
+             class="{% if active_nav == 'queue' %}active{% endif %}">Review Queue</a>
+          <a href="/audit?tenant_id={{tenant_id}}&environment={{environment}}"
+             class="{% if active_nav == 'audit' %}active{% endif %}">Audit Log</a>
+        </nav>
+      </div>
+      <div class="sidebar-footer">
+        Build challenge preview
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="breadcrumb">
+        {% block breadcrumb %}Workspace{% endblock %}
+      </div>
+      {% block page_header %}{% endblock %}
+      {% block content %}{% endblock %}
+    </main>
+
+    <div class="right-gutter"></div>
+  </div>
+</body>
+</html>

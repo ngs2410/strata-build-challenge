@@ -1,8 +1,53 @@
+'''FastAPI web view — Rachel's review-queue + audit-log pages.
+
+Programmable surface per CLAUDE.md "API first": HTTP JSON (and here,
+Jinja2-rendered HTML) is the v1 consumer-facing shape. Three GETs + one POST:
+
+  * `GET /` — redirects to the queue for the hard-coded demo tenant
+    (`verdant_grid` / `prod`). Convenience for the build-challenge demo.
+  * `GET /queue?tenant_id=...&environment=...` — joins review_items,
+    mappings, and changes in Python then renders `queue.html`. Items are
+    sorted by priority desc (highest first). Each row dict is
+    `{item, mapping, change}` with None-tolerant joins because a mapping
+    may be missing a change reference in degraded data (though in the
+    happy path it never is).
+  * `GET /audit?tenant_id=...&environment=...` — renders the full audit
+    log newest-first.
+  * `POST /queue/{review_item_id}/action` — form-encoded
+    `action in {approve, override, escalate}` + `rationale`. Delegates
+    to `src.review_queue.apply_action` which does the status flip + emits
+    the audit event. Redirects back to the queue (303 See Other).
+
+Static files are mounted at `/static` from `./static/` (holds
+`strata.css` — the single stylesheet, no JS framework per CLAUDE.md v1
+rule). Templates live in `./templates/`; the `_base.html` shell is the
+three-pane layout both `queue.html` and `audit.html` extend. The
+template context dict passes `active_nav='queue'` or `'audit'` so the
+sidebar highlights the current page.
+
+Tenant / environment plumbing: both are query parameters on every GET
+and form fields on the POST — explicit, matching the CLAUDE.md invariant
+that `environment` is a sibling of `tenant_id` everywhere.
+
+The one hedged try/except in this module (`_load_or_empty`) is
+deliberately scoped to `FileNotFoundError` from the store facade — the
+operator viewing the UI before running the pipeline is a legitimate empty
+state, not a bug. Every other exception propagates per the CLAUDE.md
+no-silent-fallback rule. The comment inline there is the "intentional
+default" marker.
+
+v1 is dev-run (`uvicorn src.web_app:app`); production shape is OIDC auth +
+RLS-bound sessions + per-tenant deployment (TDD §4.5 Future). Containerized
+deployment on tenant-chosen cloud or on-premise is a post-wedge option
+(PRD §6, TDD §7 Scaling Pathway).
+'''
+
 from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from src.review_queue import apply_action
@@ -15,8 +60,10 @@ from src.stores import (
 )
 
 TEMPLATES_DIR = Path('templates')
+STATIC_DIR = Path('static')
 
 app = FastAPI(title='Strata')
+app.mount('/static', StaticFiles(directory=str(STATIC_DIR)), name='static')
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
@@ -44,6 +91,7 @@ def queue(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
       'environment': environment,
       'rows': rows,
       'passages_by_id': passages_by_id,
+      'active_nav': 'queue',
     },
   )
 
@@ -64,6 +112,7 @@ def audit(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
       'tenant_id': tenant_id,
       'environment': environment,
       'events': events,
+      'active_nav': 'audit',
     },
   )
 

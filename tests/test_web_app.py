@@ -26,7 +26,8 @@ def test_queue_renders_review_items_after_pipeline(verdant_grid_seeded):
   run_pipeline('verdant_grid', 'prod', dry_run=False)
   response = _client().get('/queue?tenant_id=verdant_grid&environment=prod')
   assert response.status_code == 200
-  assert 'review item(s)' in response.text
+  assert 'Review Queue' in response.text
+  assert "Items awaiting Rachel's decision" in response.text
   assert 'Approve' in response.text
   assert 'Override' in response.text
   assert 'Escalate' in response.text
@@ -62,7 +63,8 @@ def test_audit_renders_events_after_pipeline(verdant_grid_seeded):
   run_pipeline('verdant_grid', 'prod', dry_run=False)
   response = _client().get('/audit?tenant_id=verdant_grid&environment=prod')
   assert response.status_code == 200
-  assert 'event(s), newest first' in response.text
+  assert 'Audit Log' in response.text
+  assert 'Newest first' in response.text
   assert 'Rollback is tracked as open question TDD §8.8' in response.text
 
 

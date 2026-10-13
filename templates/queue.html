@@ -1,151 +1,124 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Strata — Review Queue ({{tenant_id}} / {{environment}})</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 2em auto; padding: 0 1em; color: #222; }
-    h1 { border-bottom: 2px solid #333; padding-bottom: 0.25em; }
-    nav { margin: 1em 0; }
-    nav a { margin-right: 1em; text-decoration: none; color: #06c; }
-    nav a:hover { text-decoration: underline; }
-    .meta { color: #666; margin-bottom: 1em; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
-    th, td { padding: 0.6em 0.5em; border-bottom: 1px solid #ddd; text-align: left; vertical-align: top; }
-    th { background: #f4f4f4; font-weight: 600; }
-    .status { font-weight: 600; }
-    .status-pending { color: #c80; }
-    .status-approved { color: #080; }
-    .status-overridden { color: #d44; }
-    .status-escalated { color: #c04; }
-    .change-desc { max-width: 500px; font-size: 0.95em; }
-    .affected-list { margin: 0.25em 0 0 1em; padding: 0; font-size: 0.85em; }
-    .affected-list li { margin: 0.15em 0; }
-    .citation { font-size: 0.78em; color: #333; margin-top: 0.5em; padding: 0.4em 0.5em; background: #f8f8f8; border-left: 2px solid #ccc; }
-    .citation .label { color: #666; font-size: 0.9em; display: block; margin-bottom: 0.2em; }
-    .citation .passage-text { font-family: Georgia, serif; line-height: 1.4; white-space: pre-wrap; }
-    .citation mark { background: #ffe066; padding: 0 0.15em; }
-    .citation .verified { color: #080; }
-    .citation .unverified { color: #c80; }
-    form.action { margin: 0; }
-    textarea { width: 100%; min-height: 3em; font-family: inherit; font-size: 0.9em; box-sizing: border-box; }
-    button { margin-right: 0.25em; margin-top: 0.3em; padding: 0.3em 0.7em; cursor: pointer; font-size: 0.9em; }
-    .btn-approve { background: #cfe8d4; }
-    .btn-override { background: #f7dcdc; }
-    .btn-escalate { background: #f8e4b2; }
-    .empty { color: #888; font-style: italic; margin-top: 2em; }
-    details > summary { cursor: pointer; color: #06c; font-size: 0.9em; }
-    details > div { margin-top: 0.3em; padding: 0.3em 0.5em; background: #f8f8f8; border-left: 2px solid #ccc; font-size: 0.85em; }
-  </style>
-</head>
-<body>
-  <h1>Strata — Review Queue</h1>
-  <nav>
-    <a href="/queue?tenant_id={{tenant_id}}&environment={{environment}}">Queue</a>
-    <a href="/audit?tenant_id={{tenant_id}}&environment={{environment}}">Audit log</a>
-  </nav>
-  <p class="meta">Tenant: <b>{{tenant_id}}</b> · Environment: <b>{{environment}}</b> · {{rows|length}} review item(s)</p>
+{% extends "_base.html" %}
 
+{% block title %}Review Queue — Strata ({{tenant_id}} / {{environment}}){% endblock %}
+
+{% block breadcrumb %}Workspace <span class="sep">›</span> Review Queue{% endblock %}
+
+{% block page_header %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Review Queue</h1>
+    <p class="page-subtitle">Items awaiting Rachel's decision — approve, override, or escalate. Highest-priority items first.</p>
+  </div>
+  <div class="page-header-aside">
+    <span class="count">{{rows|length}}</span>
+    item{{ 's' if rows|length != 1 else '' }}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
   {% if not rows %}
-    <p class="empty">No review items for this tenant / environment yet. Run <code>env3.12/bin/python -m scripts.main_detect_changes</code> to populate.</p>
+    <div class="empty-state">
+      No review items for this tenant / environment yet. Run <code>env3.12/bin/python -m scripts.main_detect_changes</code> to populate.
+    </div>
   {% else %}
-  <table>
-    <thead>
-      <tr>
-        <th>Priority</th>
-        <th>Status</th>
-        <th>Change</th>
-        <th>Affected items</th>
-        <th>Confidence · Route · Action</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
+    <section class="card-list">
     {% for row in rows %}
-      <tr>
-        <td>{{row.item.priority}}</td>
-        <td class="status status-{{row.item.status}}">{{row.item.status}}</td>
-        <td class="change-desc">
-          {% if row.change %}
-            <div><b>{{row.change.change_type}}:</b> {{row.change.description}}</div>
-            {% if row.change.new_citation %}
-              {% set p = passages_by_id.get(row.change.new_citation.passage_id) %}
-              <div class="citation">
-                <span class="label">
-                  new citation: <code>{{row.change.new_citation.passage_id}}</code>
-                  {% if row.change.new_citation.verified %}
-                    <span class="verified">verified ✓</span>
-                  {% else %}
-                    <span class="unverified">unverified</span>
-                  {% endif %}
-                </span>
-                {% if p %}
-                  <span class="passage-text">{{p.text[:row.change.new_citation.start_offset]}}<mark>{{p.text[row.change.new_citation.start_offset:row.change.new_citation.end_offset]}}</mark>{{p.text[row.change.new_citation.end_offset:]}}</span>
+      <article class="card">
+        <div class="card-number">{{loop.index}}.</div>
+        <div class="card-body">
+          <h2 class="card-title">
+            {% if row.change %}
+              <span class="change-kind">{{row.change.change_type}}</span>{{row.change.description}}
+            {% elif row.mapping %}
+              <span class="change-kind">change</span><code>{{row.mapping.change_id}}</code>
+            {% endif %}
+          </h2>
+
+          <div class="card-meta">
+            <span class="meta-item"><span class="status-{{row.item.status}}">{{row.item.status}}</span></span>
+            <span class="meta-item"><span class="meta-label">priority</span><span class="meta-value">{{row.item.priority}}</span></span>
+            {% if row.mapping %}
+              <span class="meta-item"><span class="meta-label">confidence</span><span class="meta-value">{{row.mapping.confidence}}/5</span></span>
+              <span class="meta-item"><span class="meta-label">route</span><span class="meta-value">{{row.mapping.routing_destination}}</span></span>
+              <span class="meta-item"><span class="meta-label">action</span><span class="meta-value">{{row.mapping.recommended_action}}</span></span>
+            {% endif %}
+          </div>
+
+          {% if row.mapping and row.mapping.affected_items %}
+            <div class="affected">
+              <span class="affected-label">Affects</span>
+              {% for ai in row.mapping.affected_items %}
+                <span class="affected-item">{{ai.item_type}}: <code>{{ai.item_id}}</code><span class="conf"> {{ai.match_confidence}}/5</span></span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if row.change and row.change.new_citation %}
+            {% set p = passages_by_id.get(row.change.new_citation.passage_id) %}
+            <div class="citation">
+              <div class="citation-head">
+                <span>New citation</span>
+                <code>{{row.change.new_citation.passage_id}}</code>
+                {% if row.change.new_citation.verified %}
+                  <span class="verified">verified ✓</span>
                 {% else %}
-                  <span class="passage-text">(passage text unavailable)</span>
+                  <span class="unverified">unverified</span>
                 {% endif %}
               </div>
-            {% endif %}
-            {% if row.change.prior_citation %}
-              {% set p = passages_by_id.get(row.change.prior_citation.passage_id) %}
-              <div class="citation">
-                <span class="label">
-                  prior citation: <code>{{row.change.prior_citation.passage_id}}</code>
-                  {% if row.change.prior_citation.verified %}
-                    <span class="verified">verified ✓</span>
-                  {% else %}
-                    <span class="unverified">unverified</span>
-                  {% endif %}
-                </span>
-                {% if p %}
-                  <span class="passage-text">{{p.text[:row.change.prior_citation.start_offset]}}<mark>{{p.text[row.change.prior_citation.start_offset:row.change.prior_citation.end_offset]}}</mark>{{p.text[row.change.prior_citation.end_offset:]}}</span>
+              {% if p %}
+                <div class="passage-text">{{p.text[:row.change.new_citation.start_offset]}}<mark>{{p.text[row.change.new_citation.start_offset:row.change.new_citation.end_offset]}}</mark>{{p.text[row.change.new_citation.end_offset:]}}</div>
+              {% else %}
+                <div class="passage-text">(passage text unavailable)</div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if row.change and row.change.prior_citation %}
+            {% set p = passages_by_id.get(row.change.prior_citation.passage_id) %}
+            <div class="citation">
+              <div class="citation-head">
+                <span>Prior citation</span>
+                <code>{{row.change.prior_citation.passage_id}}</code>
+                {% if row.change.prior_citation.verified %}
+                  <span class="verified">verified ✓</span>
                 {% else %}
-                  <span class="passage-text">(passage text unavailable)</span>
+                  <span class="unverified">unverified</span>
                 {% endif %}
               </div>
-            {% endif %}
-          {% elif row.mapping %}
-            <div><code>{{row.mapping.change_id}}</code></div>
+              {% if p %}
+                <div class="passage-text">{{p.text[:row.change.prior_citation.start_offset]}}<mark>{{p.text[row.change.prior_citation.start_offset:row.change.prior_citation.end_offset]}}</mark>{{p.text[row.change.prior_citation.end_offset:]}}</div>
+              {% else %}
+                <div class="passage-text">(passage text unavailable)</div>
+              {% endif %}
+            </div>
           {% endif %}
+
           {% if row.mapping %}
-            <details><summary>Mapping rationale</summary><div>{{row.mapping.rationale}}</div></details>
+            <details class="rationale">
+              <summary>Mapping rationale</summary>
+              <div>{{row.mapping.rationale}}</div>
+            </details>
           {% endif %}
-        </td>
-        <td>
-          {% if row.mapping %}
-            <ul class="affected-list">
-            {% for ai in row.mapping.affected_items %}
-              <li>{{ai.item_type}}: <code>{{ai.item_id}}</code> ({{ai.match_confidence}}/5)</li>
-            {% endfor %}
-            </ul>
-          {% endif %}
-        </td>
-        <td>
-          {% if row.mapping %}
-            <div>conf: {{row.mapping.confidence}}/5</div>
-            <div>route: <b>{{row.mapping.routing_destination}}</b></div>
-            <div>action: <b>{{row.mapping.recommended_action}}</b></div>
-          {% endif %}
-        </td>
-        <td>
+
           {% if row.item.status in ['pending', 'escalated'] %}
-          <form class="action" method="post" action="/queue/{{row.item.review_item_id}}/action">
-            <input type="hidden" name="tenant_id" value="{{tenant_id}}">
-            <input type="hidden" name="environment" value="{{environment}}">
-            <textarea name="rationale" placeholder="Why?" required></textarea>
-            <br>
-            <button class="btn-approve" name="action" value="approve">Approve</button>
-            <button class="btn-override" name="action" value="override">Override</button>
-            <button class="btn-escalate" name="action" value="escalate">Escalate</button>
-          </form>
+            <form class="action-form" method="post" action="/queue/{{row.item.review_item_id}}/action">
+              <input type="hidden" name="tenant_id" value="{{tenant_id}}">
+              <input type="hidden" name="environment" value="{{environment}}">
+              <textarea name="rationale" placeholder="Rationale for this decision…" required></textarea>
+              <div class="action-row">
+                <button type="submit" class="btn btn-ghost" name="action" value="escalate">Escalate</button>
+                <button type="submit" class="btn btn-ghost" name="action" value="override">Override</button>
+                <button type="submit" class="btn btn-primary" name="action" value="approve">Approve</button>
+              </div>
+            </form>
           {% else %}
-            <em>no action available</em>
+            <div class="no-action">No action available — item is {{row.item.status}}.</div>
           {% endif %}
-        </td>
-      </tr>
+        </div>
+      </article>
     {% endfor %}
-    </tbody>
-  </table>
+    </section>
   {% endif %}
-</body>
-</html>
+{% endblock %}

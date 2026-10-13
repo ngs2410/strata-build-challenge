@@ -19,8 +19,8 @@
       "included_inputs": []
     },
     "obligation_extraction": {
-      "model_identifier": "stub://obligation_extraction",
-      "max_tokens": 4096,
+      "model_identifier": "openai://gpt-5.4-nano",
+      "max_tokens": 8192,
       "reasoning_effort": "medium",
       "verbosity": "low",
       "included_inputs": []

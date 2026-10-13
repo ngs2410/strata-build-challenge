@@ -5,6 +5,7 @@ from src.prompt_calibration import (
   CONFIDENCE_LEVELS,
   OBLIGATION_TAXONOMY_REFERENCE,
   OBLIGATION_TYPES,
+  REGULATED_ENTITY_PERSPECTIVE,
 )
 
 
@@ -43,3 +44,39 @@ def test_each_obligation_type_body_has_description_and_example():
     assert 'example' in body
     assert body['description']
     assert body['example']
+
+
+def test_regulated_entity_perspective_names_the_rule_and_the_de_facto_tightening():
+  # The perspective constant is the single reference for the "whose
+  # perspective" ambiguity that bit version_diff on the Order 2222
+  # minimum-size change. Any prompt that uses "tightened" or "loosened"
+  # must either reuse CHANGE_TYPE_RUBRIC (which includes this) or
+  # include the constant standalone.
+  assert 'REGULATED ENTITY' in REGULATED_ENTITY_PERSPECTIVE
+  assert 'de facto' in REGULATED_ENTITY_PERSPECTIVE
+  assert 'TIGHTENING' in REGULATED_ENTITY_PERSPECTIVE
+  assert 'LOOSENING' in REGULATED_ENTITY_PERSPECTIVE
+
+
+def test_change_type_rubric_includes_regulated_entity_perspective():
+  # The rubric must embed the perspective rule inline so a prompt that
+  # includes CHANGE_TYPE_RUBRIC automatically teaches the LLM the
+  # project convention — no separate opt-in required.
+  assert REGULATED_ENTITY_PERSPECTIVE in CHANGE_TYPE_RUBRIC
+
+
+def test_tightened_and_loosened_descriptions_name_the_regulated_entity():
+  # The two change types whose direction depends on perspective must
+  # name "the regulated entity" explicitly in their definitions —
+  # the perspective rule must be visible at the point of classification,
+  # not just at the top of the rubric.
+  assert 'REGULATED ENTITY' in CHANGE_TYPES['tightened']
+  assert 'REGULATED ENTITY' in CHANGE_TYPES['loosened']
+
+
+def test_added_and_removed_descriptions_name_null_citation_sides():
+  # The two "one side only" change types must say which citation is
+  # null — this is the second observed failure mode (prior_citation
+  # emitted on added changes).
+  assert 'prior_citation must be null' in CHANGE_TYPES['added']
+  assert 'new_citation must be null' in CHANGE_TYPES['removed']

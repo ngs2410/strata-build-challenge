@@ -57,7 +57,6 @@ def ground_citations_for_changes(
 ) -> list[Change]:
   config = load_domain_config(prior.tenant_id, prior.environment)
   min_span = config.citation.min_citation_span_chars
-  passages_by_id = _passages_by_id(prior, final)
   now = datetime.now(timezone.utc)
   return [
     Change(
@@ -67,8 +66,8 @@ def ground_citations_for_changes(
       proceeding_id=prior.proceeding_id,
       change_type=lc.change_type,
       description=lc.description,
-      prior_citation=_resolve(lc.prior_citation, passages_by_id, min_span),
-      new_citation=_resolve(lc.new_citation, passages_by_id, min_span),
+      prior_citation=_resolve(lc.prior_citation, prior.passages, min_span),
+      new_citation=_resolve(lc.new_citation, final.passages, min_span),
       confidence=lc.confidence,
       confidence_rationale=lc.confidence_rationale,
       detected_at=now,
@@ -83,10 +82,9 @@ def ground_obligations(
 ) -> list[ExtractedObligation]:
   config = load_domain_config(version.tenant_id, version.environment)
   min_span = config.citation.min_citation_span_chars
-  passages_by_id = {p.passage_id: p for p in version.passages}
   resolved: list[ExtractedObligation] = []
   for index, lo in enumerate(llm_obligations):
-    citation = _resolve(lo.citation, passages_by_id, min_span)
+    citation = _resolve(lo.citation, version.passages, min_span)
     if citation is None:
       raise ValueError(f'extracted obligation at index {index} has no citation')
     resolved.append(
@@ -109,18 +107,21 @@ def ground_obligations(
 
 def _resolve(
   llm_citation: LlmCitation | None,
-  passages_by_id: dict[str, Passage],
+  passages: tuple[Passage, ...],
   min_span: int,
 ) -> Citation | None:
   if llm_citation is None:
     return None
-  if llm_citation.passage_id not in passages_by_id:
-    raise ValueError(f'citation references unknown passage_id: {llm_citation.passage_id}')
-  passage = passages_by_id[llm_citation.passage_id]
+  if not (0 <= llm_citation.passage_index < len(passages)):
+    raise ValueError(
+      f'citation references passage_index={llm_citation.passage_index} '
+      f'out of range [0, {len(passages)})'
+    )
+  passage = passages[llm_citation.passage_index]
   citing_span = llm_citation.citing_span
   if len(citing_span) < min_span:
     return Citation(
-      passage_id=llm_citation.passage_id,
+      passage_id=passage.passage_id,
       start_offset=0,
       end_offset=0,
       verified=False,
@@ -131,22 +132,16 @@ def _resolve(
   start = passage.text.find(citing_span)
   if start < 0:
     return Citation(
-      passage_id=llm_citation.passage_id,
+      passage_id=passage.passage_id,
       start_offset=0,
       end_offset=0,
       verified=False,
       verification_rationale='citing span not found in cited passage',
     )
   return Citation(
-    passage_id=llm_citation.passage_id,
+    passage_id=passage.passage_id,
     start_offset=start,
     end_offset=start + len(citing_span),
     verified=False,
     verification_rationale='pending citation_verify stage',
   )
-
-
-def _passages_by_id(
-  prior: ProceedingVersion, final: ProceedingVersion
-) -> dict[str, Passage]:
-  return {p.passage_id: p for v in (prior, final) for p in v.passages}

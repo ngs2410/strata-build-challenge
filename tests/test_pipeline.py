@@ -133,7 +133,7 @@ def test_detect_changes_returns_three_llm_changes_in_known_order():
   assert [c.change_type for c in llm_changes] == ['loosened', 'tightened', 'added']
   assert llm_changes[2].prior_citation is None  # 'added' change has no prior
   assert llm_changes[0].prior_citation is not None
-  assert llm_changes[0].prior_citation.passage_id == 'proc:nopr:§1:p1'
+  assert llm_changes[0].prior_citation.passage_index == 0
   # LlmCitation carries citing_span (verbatim text), NOT offsets
   assert llm_changes[0].prior_citation.citing_span
   assert not hasattr(llm_changes[0].prior_citation, 'start_offset')
@@ -148,9 +148,10 @@ def test_ground_citations_finds_substring_and_computes_offsets():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
   known_span = 'The aggregator shall register'
-  llm_cit = LlmCitation(passage_id='proc:nopr:§1:p1', citing_span=known_span)
+  llm_cit = LlmCitation(passage_index=0, citing_span=known_span)
   lc = _llm_change('tightened', prior_citation=llm_cit)
   grounded = ground_citations_for_changes([lc], nopr, final)
+  assert grounded[0].prior_citation.passage_id == 'proc:nopr:§1:p1'
   assert grounded[0].prior_citation.start_offset == 0
   assert grounded[0].prior_citation.end_offset == len(known_span)
   assert grounded[0].prior_citation.verified is False  # pending verify stage
@@ -161,7 +162,7 @@ def test_ground_citations_marks_unverified_when_citing_span_not_found():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
   absent = LlmCitation(
-    passage_id='proc:nopr:§1:p1',
+    passage_index=0,
     citing_span='text that is definitely not in the passage',
   )
   lc = _llm_change('tightened', prior_citation=absent)
@@ -170,12 +171,12 @@ def test_ground_citations_marks_unverified_when_citing_span_not_found():
   assert 'not found' in grounded[0].prior_citation.verification_rationale
 
 
-def test_ground_citations_raises_on_unknown_passage_id():
+def test_ground_citations_raises_on_out_of_range_passage_index():
   nopr = _version('draft', 'nopr')
   final = _version('final', 'final')
-  bogus = LlmCitation(passage_id='proc:nopr:§99:p99', citing_span='anything')
+  bogus = LlmCitation(passage_index=99, citing_span='anything')
   lc = _llm_change('tightened', prior_citation=bogus)
-  with pytest.raises(ValueError, match='unknown passage_id'):
+  with pytest.raises(ValueError, match='out of range'):
     ground_citations_for_changes([lc], nopr, final)
 
 
@@ -186,7 +187,7 @@ def test_ground_citations_marks_unverified_when_span_below_min(verdant_grid_seed
   # min_citation_span_chars defaults to 10 in the Verdant config. A 3-char
   # citing_span is below that floor and must flip verified=False with a
   # specific rationale, so citation_threshold at review time picks it up.
-  narrow = LlmCitation(passage_id='proc:nopr:§1:p1', citing_span='The')
+  narrow = LlmCitation(passage_index=0, citing_span='The')
   lc = _llm_change('tightened', prior_citation=narrow)
   grounded = ground_citations_for_changes([lc], nopr, final)
   assert grounded[0].prior_citation.verified is False

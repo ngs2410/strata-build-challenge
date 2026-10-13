@@ -43,7 +43,7 @@ OBLIGATION_EXTRACTION_JSON_EXAMPLE = """{
       "summary": "<one-sentence summary of the obligation>",
       "full_text": "<verbatim obligation text from the passage>",
       "citation": {
-        "passage_id": "<passage id that establishes this obligation>",
+        "passage_index": <int 0-based index into the version's passage list>,
         "citing_span": "<verbatim text span copied character-for-character from the cited passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
@@ -97,7 +97,7 @@ OBLIGATION_EXTRACTION_SPEC = CallSpec(
 
 
 def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec:
-  passage_text = '\n\n'.join(p.text for p in version.passages)
+  passage_text = '\n\n'.join(f'[{i}] {p.text}' for i, p in enumerate(version.passages))
   return PromptSpec(
     system_prompt=(
       'You are a regulatory obligation extractor. You identify the discrete '
@@ -114,20 +114,22 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       '- One LlmExtractedObligation per discrete obligation.\n'
       '- obligation_type is one of reporting / operational / procedural / '
       'financial per the taxonomy above.\n'
-      '- Each obligation carries a structural citation: passage_id + '
-      'citing_span. citing_span is the VERBATIM text copied '
-      'character-for-character from the cited passage. Do NOT paraphrase, '
-      'summarise, or truncate mid-word. Do NOT count characters or emit '
-      'numeric offsets — grounding is done deterministically by Python '
-      'after this call.'
+      '- Each obligation carries a structural citation: passage_index + '
+      'citing_span. passage_index is the 0-based index into the Inputs '
+      'passage list (count the "[0]" / "[1]" / ... prefixes). citing_span '
+      'is the VERBATIM text copied character-for-character from the cited '
+      'passage. Do NOT paraphrase, summarise, or truncate mid-word. Do NOT '
+      'count characters or emit numeric offsets — grounding is done '
+      'deterministically by Python after this call.'
     ),
     field_intents=(
       '- obligation_type: one of reporting / operational / procedural / '
       'financial per the taxonomy above.\n'
       '- summary: one-sentence summary of the obligation.\n'
       '- full_text: verbatim obligation text copied from the passage.\n'
-      '- citation: LlmCitation with passage_id + citing_span (verbatim '
-      'supporting span from the cited passage).\n'
+      '- citation: LlmCitation with passage_index (0-based index into the '
+      'passage list) + citing_span (verbatim supporting span from the '
+      'cited passage).\n'
       '- confidence: integer 0-5 per the confidence rubric above.\n'
       '- confidence_rationale: one sentence naming the rubric level you '
       'picked and why.\n'
@@ -147,7 +149,7 @@ def stub_obligation_extraction_response(params: dict) -> ObligationExtractionRes
     return ObligationExtractionResponse(extracted_obligations=())
   anchor = version.passages[0]
   citation = LlmCitation(
-    passage_id=anchor.passage_id,
+    passage_index=0,
     citing_span=anchor.text[: min(len(anchor.text), 200)],
   )
   return ObligationExtractionResponse(

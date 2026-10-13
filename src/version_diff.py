@@ -56,11 +56,11 @@ VERSION_DIFF_JSON_EXAMPLE = """{
       "change_type": "<added|removed|tightened|loosened|cosmetic>",
       "description": "<one-sentence description of the semantic shift>",
       "prior_citation": {
-        "passage_id": "<passage id from the prior version>",
+        "passage_index": <int 0-based index into the prior version's passage list>,
         "citing_span": "<verbatim text copied character-for-character from the cited prior passage>"
       },
       "new_citation": {
-        "passage_id": "<passage id from the new version>",
+        "passage_index": <int 0-based index into the new version's passage list>,
         "citing_span": "<verbatim text copied character-for-character from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
@@ -77,7 +77,7 @@ Also valid when change_type="added" — the whole prior_citation object is null:
       "description": "<one-sentence description>",
       "prior_citation": null,
       "new_citation": {
-        "passage_id": "<passage id from the new version>",
+        "passage_index": <int 0-based index into the new version's passage list>,
         "citing_span": "<verbatim text span from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
@@ -93,7 +93,7 @@ Also valid when change_type="removed" — the whole new_citation object is null:
       "change_type": "removed",
       "description": "<one-sentence description>",
       "prior_citation": {
-        "passage_id": "<passage id from the prior version>",
+        "passage_index": <int 0-based index into the prior version's passage list>,
         "citing_span": "<verbatim text span from the cited prior passage>"
       },
       "new_citation": null,
@@ -144,8 +144,8 @@ VERSION_DIFF_SPEC = CallSpec(
 
 
 def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion) -> PromptSpec:
-  prior_text = '\n\n'.join(p.text for p in prior.passages)
-  new_text = '\n\n'.join(p.text for p in final.passages)
+  prior_text = '\n\n'.join(f'[{i}] {p.text}' for i, p in enumerate(prior.passages))
+  new_text = '\n\n'.join(f'[{i}] {p.text}' for i, p in enumerate(final.passages))
   return PromptSpec(
     system_prompt=(
       'You are a regulatory-change analyst. You compare the draft (NOPR) and '
@@ -165,6 +165,9 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       '- Attach prior_citation and new_citation; set one to null when the '
       'change is added-only or removed-only.\n'
       '- Pure rewording that preserves meaning is cosmetic, not material.\n'
+      '- passage_index is the 0-based index into the matching version\'s '
+      'passage list (prior or new) as rendered in the Inputs section. Count '
+      'the "[0]" / "[1]" / ... prefixes.\n'
       '- citing_span is the VERBATIM text copied character-for-character '
       "from the cited passage. Do NOT paraphrase, summarise, or truncate "
       'mid-word. Do NOT count characters or emit numeric offsets — grounding '
@@ -175,10 +178,11 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       'cosmetic per the change-type rubric above.\n'
       '- description: one-sentence summary of the semantic shift between the '
       'prior and new versions.\n'
-      '- prior_citation: an LlmCitation (passage_id + citing_span) pointing '
-      'at the span in the PRIOR version. null when change_type="added".\n'
-      '- new_citation: an LlmCitation pointing at the span in the NEW '
-      'version. null when change_type="removed".\n'
+      '- prior_citation: an LlmCitation (passage_index into the PRIOR '
+      'version\'s passage list + citing_span). null when '
+      'change_type="added".\n'
+      '- new_citation: an LlmCitation (passage_index into the NEW version\'s '
+      'passage list + citing_span). null when change_type="removed".\n'
       '- confidence: integer 0-5 per the confidence rubric above.\n'
       '- confidence_rationale: one sentence naming the rubric level you '
       'picked and why.\n'
@@ -207,8 +211,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Final Rule permits RTOs/ISOs to establish an aggregation minimum size up to '
         '100 kW; NOPR explicitly disallowed any minimum size.'
       ),
-      prior_citation=_stub_llm_citation(prior, 1),
-      new_citation=_stub_llm_citation(final, 1),
+      prior_citation=_stub_llm_citation(prior, 0),
+      new_citation=_stub_llm_citation(final, 0),
       confidence=4,
       confidence_rationale=(
         'Direct textual contrast between subsection (A) of NOPR and Final Rule — '
@@ -221,8 +225,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Final Rule requires aggregator registration at least 60 days before '
         'participation; NOPR had no lead-time requirement.'
       ),
-      prior_citation=_stub_llm_citation(prior, 2),
-      new_citation=_stub_llm_citation(final, 2),
+      prior_citation=_stub_llm_citation(prior, 1),
+      new_citation=_stub_llm_citation(final, 1),
       confidence=4,
       confidence_rationale=(
         'Subsection (B) adds the 60-day lead time in Final; stub-generated against '
@@ -236,7 +240,7 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'rated ≥100 kW; NOPR had no telemetry requirement.'
       ),
       prior_citation=None,
-      new_citation=_stub_llm_citation(final, 3),
+      new_citation=_stub_llm_citation(final, 2),
       confidence=5,
       confidence_rationale=(
         'Final subsection (C) adds the telemetry obligation; stub-generated against '
@@ -274,18 +278,9 @@ def detect_changes(prior: ProceedingVersion, final: ProceedingVersion) -> list[L
   return list(response.changes)
 
 
-def _stub_llm_citation(version: ProceedingVersion, position: int) -> LlmCitation:
-  passage = _passage_at_position(version, position)
+def _stub_llm_citation(version: ProceedingVersion, index: int) -> LlmCitation:
+  passage = version.passages[index]
   return LlmCitation(
-    passage_id=passage.passage_id,
+    passage_index=index,
     citing_span=passage.text[: min(len(passage.text), 200)],
-  )
-
-
-def _passage_at_position(version: ProceedingVersion, position: int):
-  for passage in version.passages:
-    if passage.position == position:
-      return passage
-  raise ValueError(
-    f'no passage at position {position} in {version.proceeding_id}:{version.version_id}'
   )

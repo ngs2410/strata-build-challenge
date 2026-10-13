@@ -88,6 +88,7 @@ def _mapping(confidence, affected_items=()):
 def _config(threshold):
   return DomainConfig(
     escalation=EscalationConfig(mapping_threshold=threshold, citation_threshold=3),
+    task_model_configs={},
   )
 
 

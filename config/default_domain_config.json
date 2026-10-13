@@ -2,5 +2,35 @@
   "escalation": {
     "mapping_threshold": 3,
     "citation_threshold": 3
+  },
+  "task_model_configs": {
+    "version_diff": {
+      "model_identifier": "stub://version_diff",
+      "max_tokens": 4096,
+      "reasoning_effort": "medium",
+      "verbosity": "low",
+      "included_inputs": []
+    },
+    "citation_verify": {
+      "model_identifier": "stub://citation_verify",
+      "max_tokens": 1024,
+      "reasoning_effort": "low",
+      "verbosity": "low",
+      "included_inputs": []
+    },
+    "obligation_extraction": {
+      "model_identifier": "stub://obligation_extraction",
+      "max_tokens": 4096,
+      "reasoning_effort": "medium",
+      "verbosity": "low",
+      "included_inputs": []
+    },
+    "mapping": {
+      "model_identifier": "stub://mapping",
+      "max_tokens": 8192,
+      "reasoning_effort": "low",
+      "verbosity": "low",
+      "included_inputs": []
+    }
   }
 }

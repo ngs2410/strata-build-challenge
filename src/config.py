@@ -170,9 +170,19 @@ class EscalationConfig(BaseModel):
   citation_threshold: int
 
 
+class TaskModelConfig(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  model_identifier: str
+  max_tokens: int
+  reasoning_effort: Literal['none', 'low', 'medium', 'high']
+  verbosity: Literal['low', 'medium', 'high']
+  included_inputs: tuple[str, ...]
+
+
 class DomainConfig(BaseModel):
   model_config = ConfigDict(extra='forbid')
   escalation: EscalationConfig
+  task_model_configs: dict[str, TaskModelConfig]
 
 
 def load_domain_config(tenant_id: str, environment: str) -> DomainConfig:

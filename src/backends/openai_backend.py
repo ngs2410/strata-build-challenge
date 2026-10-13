@@ -1,6 +1,8 @@
+import time
 from decimal import Decimal
 from typing import TypeVar
 
+from openai import APIConnectionError, InternalServerError, RateLimitError
 from pydantic import BaseModel
 
 from src.config import TaskModelConfig
@@ -10,6 +12,15 @@ from src.telemetry import get_logger
 T = TypeVar('T', bound=BaseModel)
 
 BACKEND_PREFIX = 'openai://'
+
+RETRYABLE_EXCEPTIONS: tuple[type[Exception], ...] = (
+  RateLimitError,
+  InternalServerError,
+  APIConnectionError,
+)
+MAX_RETRIES = 3
+INITIAL_BACKOFF_SECONDS = 1.0
+BACKOFF_MULTIPLIER = 2.0
 
 _PRICING_USD_PER_1K_TOKENS: dict[str, dict[str, Decimal]] = {
   'gpt-5.4-nano': {
@@ -38,13 +49,8 @@ class OpenAIBackend:
     del call_spec
     model_name = task_config.model_identifier.removeprefix(BACKEND_PREFIX)
     client = self._get_client()
-    response = client.responses.parse(
-      model=model_name,
-      input=params['input'],
-      text_format=response_type,
-      max_output_tokens=task_config.max_tokens,
-      reasoning={'effort': task_config.reasoning_effort},
-      text={'verbosity': task_config.verbosity},
+    response = self._dispatch_with_retry(
+      client, task_name, model_name, task_config, params, response_type
     )
     if getattr(response, 'status', None) == 'incomplete':
       raise RuntimeError(
@@ -78,6 +84,48 @@ class OpenAIBackend:
 
       self._client = OpenAI()
     return self._client
+
+  def _dispatch_with_retry(
+    self,
+    client,
+    task_name: str,
+    model_name: str,
+    task_config: TaskModelConfig,
+    params: dict,
+    response_type: type[T],
+  ):
+    delay = INITIAL_BACKOFF_SECONDS
+    for attempt in range(MAX_RETRIES + 1):
+      try:
+        return client.responses.parse(
+          model=model_name,
+          input=params['input'],
+          text_format=response_type,
+          max_output_tokens=task_config.max_tokens,
+          reasoning={'effort': task_config.reasoning_effort},
+          text={'verbosity': task_config.verbosity},
+        )
+      except RETRYABLE_EXCEPTIONS as exc:
+        if attempt == MAX_RETRIES:
+          self._log.error(
+            'openai_backend.retry_exhausted',
+            task_name=task_name,
+            model_name=model_name,
+            attempt=attempt,
+            error_type=type(exc).__name__,
+          )
+          raise
+        self._log.warning(
+          'openai_backend.retry',
+          task_name=task_name,
+          model_name=model_name,
+          attempt=attempt,
+          next_delay_seconds=delay,
+          error_type=type(exc).__name__,
+        )
+        time.sleep(delay)
+        delay *= BACKOFF_MULTIPLIER
+    raise RuntimeError('unreachable')
 
 
 def _extract_refusal(response) -> str | None:

@@ -2,11 +2,13 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import httpx2 as httpx
 import pytest
 import structlog
+from openai import APIConnectionError, InternalServerError, RateLimitError
 from pydantic import BaseModel, ConfigDict
 
-from src.backends.openai_backend import OpenAIBackend
+from src.backends.openai_backend import MAX_RETRIES, OpenAIBackend
 from src.config import TaskModelConfig
 from src.llm import CallSpec
 
@@ -157,6 +159,105 @@ def test_openai_backend_logs_token_usage_and_cost():
     + Decimal(500) * Decimal('0.00040') / Decimal(1000)
   ).quantize(Decimal('0.000001'))
   assert event['estimated_cost_usd'] == str(expected_cost)
+
+
+def _rate_limit_error() -> RateLimitError:
+  req = httpx.Request('POST', 'https://x')
+  resp = httpx.Response(status_code=429, request=req)
+  return RateLimitError('rate limited', response=resp, body=None)
+
+
+def _internal_server_error() -> InternalServerError:
+  req = httpx.Request('POST', 'https://x')
+  resp = httpx.Response(status_code=500, request=req)
+  return InternalServerError('server error', response=resp, body=None)
+
+
+def _api_connection_error() -> APIConnectionError:
+  req = httpx.Request('POST', 'https://x')
+  return APIConnectionError(request=req)
+
+
+def test_openai_backend_retries_on_rate_limit_then_succeeds(monkeypatch):
+  canned = _MiniResponse(answer='ok')
+  client = MagicMock()
+  client.responses.parse.side_effect = [_rate_limit_error(), _ok_response(canned)]
+  monkeypatch.setattr('src.backends.openai_backend.time.sleep', lambda _: None)
+  backend = OpenAIBackend(client=client)
+  result = backend.call(
+    task_name='t',
+    task_config=_task_config(),
+    params={'input': []},
+    response_type=_MiniResponse,
+    call_spec=_CALL_SPEC,
+  )
+  assert result.answer == 'ok'
+  assert client.responses.parse.call_count == 2
+
+
+def test_openai_backend_retries_on_internal_server_error_then_succeeds(monkeypatch):
+  canned = _MiniResponse(answer='ok')
+  client = MagicMock()
+  client.responses.parse.side_effect = [_internal_server_error(), _ok_response(canned)]
+  monkeypatch.setattr('src.backends.openai_backend.time.sleep', lambda _: None)
+  backend = OpenAIBackend(client=client)
+  result = backend.call(
+    task_name='t',
+    task_config=_task_config(),
+    params={'input': []},
+    response_type=_MiniResponse,
+    call_spec=_CALL_SPEC,
+  )
+  assert result.answer == 'ok'
+  assert client.responses.parse.call_count == 2
+
+
+def test_openai_backend_retries_on_api_connection_error_then_succeeds(monkeypatch):
+  canned = _MiniResponse(answer='ok')
+  client = MagicMock()
+  client.responses.parse.side_effect = [_api_connection_error(), _ok_response(canned)]
+  monkeypatch.setattr('src.backends.openai_backend.time.sleep', lambda _: None)
+  backend = OpenAIBackend(client=client)
+  result = backend.call(
+    task_name='t',
+    task_config=_task_config(),
+    params={'input': []},
+    response_type=_MiniResponse,
+    call_spec=_CALL_SPEC,
+  )
+  assert result.answer == 'ok'
+
+
+def test_openai_backend_gives_up_after_max_retries(monkeypatch):
+  client = MagicMock()
+  client.responses.parse.side_effect = [_rate_limit_error()] * (MAX_RETRIES + 1)
+  monkeypatch.setattr('src.backends.openai_backend.time.sleep', lambda _: None)
+  backend = OpenAIBackend(client=client)
+  with pytest.raises(RateLimitError):
+    backend.call(
+      task_name='t',
+      task_config=_task_config(),
+      params={'input': []},
+      response_type=_MiniResponse,
+      call_spec=_CALL_SPEC,
+    )
+  assert client.responses.parse.call_count == MAX_RETRIES + 1
+
+
+def test_openai_backend_does_not_retry_on_non_retryable_error(monkeypatch):
+  client = MagicMock()
+  client.responses.parse.side_effect = ValueError('bad request')
+  monkeypatch.setattr('src.backends.openai_backend.time.sleep', lambda _: None)
+  backend = OpenAIBackend(client=client)
+  with pytest.raises(ValueError):
+    backend.call(
+      task_name='t',
+      task_config=_task_config(),
+      params={'input': []},
+      response_type=_MiniResponse,
+      call_spec=_CALL_SPEC,
+    )
+  assert client.responses.parse.call_count == 1
 
 
 def test_openai_backend_logs_warning_when_pricing_missing():

@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict
 
 CONFIG_DIR = Path('config')
 DEFAULT_CONFIG_FILENAME = 'default_domain_config.json'
+TENANT_DATA_DIR = Path('data/tenants')
+TENANT_OVERRIDE_FILENAME = 'domain_config.json'
 
 
 class Passage(BaseModel):
@@ -188,7 +190,24 @@ class DomainConfig(BaseModel):
 
 
 def load_domain_config(tenant_id: str, environment: str) -> DomainConfig:
-  del tenant_id, environment
   default_path = CONFIG_DIR / DEFAULT_CONFIG_FILENAME
-  raw = orjson.loads(default_path.read_bytes())
-  return DomainConfig.model_validate(raw)
+  merged = orjson.loads(default_path.read_bytes())
+  override_path = TENANT_DATA_DIR / tenant_id / environment / TENANT_OVERRIDE_FILENAME
+  if override_path.is_file():
+    override = orjson.loads(override_path.read_bytes())
+    merged = _deep_merge(merged, override)
+  return DomainConfig.model_validate(merged)
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+  result = dict(base)
+  for key, override_value in override.items():
+    if (
+      key in result
+      and isinstance(result[key], dict)
+      and isinstance(override_value, dict)
+    ):
+      result[key] = _deep_merge(result[key], override_value)
+    else:
+      result[key] = override_value
+  return result

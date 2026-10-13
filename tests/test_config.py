@@ -135,3 +135,44 @@ def test_load_domain_config_reads_default_file():
   assert isinstance(config, DomainConfig)
   assert config.escalation.mapping_threshold == 3
   assert config.escalation.citation_threshold == 3
+
+
+def test_load_domain_config_deep_merges_tenant_override(tmp_path, monkeypatch):
+  import orjson
+
+  tenant_dir = tmp_path / 'overrides' / 'acme_corp' / 'staging'
+  tenant_dir.mkdir(parents=True)
+  (tenant_dir / 'domain_config.json').write_bytes(
+    orjson.dumps({'escalation': {'mapping_threshold': 5}})
+  )
+  monkeypatch.setattr('src.config.TENANT_DATA_DIR', tmp_path / 'overrides')
+  config = load_domain_config('acme_corp', 'staging')
+  assert config.escalation.mapping_threshold == 5
+  assert config.escalation.citation_threshold == 3  # unchanged from default
+  assert 'version_diff' in config.task_model_configs  # task block unchanged
+
+
+def test_load_domain_config_override_can_change_task_model_identifier(
+  tmp_path, monkeypatch
+):
+  import orjson
+
+  tenant_dir = tmp_path / 'overrides' / 'acme_corp' / 'prod'
+  tenant_dir.mkdir(parents=True)
+  (tenant_dir / 'domain_config.json').write_bytes(
+    orjson.dumps(
+      {'task_model_configs': {'mapping': {'model_identifier': 'openai://gpt-x'}}}
+    )
+  )
+  monkeypatch.setattr('src.config.TENANT_DATA_DIR', tmp_path / 'overrides')
+  config = load_domain_config('acme_corp', 'prod')
+  assert config.task_model_configs['mapping'].model_identifier == 'openai://gpt-x'
+  assert config.task_model_configs['mapping'].max_tokens == 8192  # unchanged
+  # Non-overridden tasks are untouched
+  assert config.task_model_configs['version_diff'].model_identifier == 'openai://gpt-5.4-nano'
+
+
+def test_load_domain_config_ignores_missing_override_file(tmp_path, monkeypatch):
+  monkeypatch.setattr('src.config.TENANT_DATA_DIR', tmp_path / 'empty')
+  config = load_domain_config('nonexistent', 'prod')
+  assert config.escalation.mapping_threshold == 3

@@ -3,8 +3,33 @@ from pydantic import BaseModel, ConfigDict
 from src.config import Citation, ExtractedObligation, ProceedingVersion
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
+from src.prompt_calibration import CONFIDENCE_LEVEL_RUBRIC, OBLIGATION_TAXONOMY_REFERENCE
 
 TASK_NAME = 'obligation_extraction'
+
+OBLIGATION_EXTRACTION_JSON_EXAMPLE = """{
+  "extracted_obligations": [
+    {
+      "extraction_id": "<stable id for this extraction>",
+      "tenant_id": "<tenant id>",
+      "environment": "<environment>",
+      "proceeding_id": "<proceeding id>",
+      "version_id": "<version id>",
+      "obligation_type": "<reporting|operational|procedural|financial>",
+      "summary": "<one-sentence summary of the obligation>",
+      "full_text": "<verbatim obligation text from the passage>",
+      "citation": {
+        "passage_id": "<passage id that establishes this obligation>",
+        "start_offset": <int>,
+        "end_offset": <int>,
+        "verified": false,
+        "verification_rationale": "pending citation_verify stage"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>"
+    }
+  ]
+}"""
 
 STUB_RATIONALE = (
   'stub extraction: hand-constructed example obligation covering the '
@@ -44,15 +69,19 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       'cite each to its source passage. You produce structured JSON output.'
     ),
     task='Extract every discrete obligation from the passage below.',
+    details=OBLIGATION_TAXONOMY_REFERENCE + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
       '- One ExtractedObligation per discrete obligation.\n'
       '- obligation_type is one of reporting / operational / procedural / '
-      'financial.\n'
-      '- Each obligation carries a structural citation (passage_id + offsets).'
+      'financial per the taxonomy in Details.\n'
+      '- Each obligation carries a structural citation (passage_id + offsets).\n'
+      '- Report confidence as an integer 0-5 per the confidence rubric in '
+      'Details; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'passage_text': ('--- start of passage ---\n' + passage_text + '\n--- end of passage ---'),
     },
+    json_example=OBLIGATION_EXTRACTION_JSON_EXAMPLE,
   )
 
 

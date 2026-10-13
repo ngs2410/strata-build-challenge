@@ -3,8 +3,31 @@ from pydantic import BaseModel, ConfigDict
 from src.config import AffectedItem, Change, Document, Mapping, Obligation, Project
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
+from src.prompt_calibration import CONFIDENCE_LEVEL_RUBRIC
 
 TASK_NAME = 'mapping'
+
+MAPPING_JSON_EXAMPLE = """{
+  "mapping": {
+    "mapping_id": "<stable id for this mapping>",
+    "tenant_id": "<tenant id>",
+    "environment": "<environment>",
+    "change_id": "<change id this mapping covers>",
+    "affected_items": [
+      {
+        "item_type": "<obligation|project|document>",
+        "item_id": "<id of the affected item, copied from candidate list>",
+        "match_confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+        "match_rationale": "<one sentence naming the specific overlap>"
+      }
+    ],
+    "recommended_action": "<review|amend|no_op>",
+    "routing_destination": "<market_ops|legal|it_metering>",
+    "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+    "confidence_rationale": "<which rubric level you picked and why>",
+    "rationale": "<one paragraph summarising WHY this change maps to these items and this team>"
+  }
+}"""
 
 STUB_RATIONALE = (
   'stub mapping: assigns affected items by naive match on obligation '
@@ -72,12 +95,16 @@ def build_mapping_prompt(
       'Map the Change below to its affected items. Recommend an action and '
       'route to the right internal team.'
     ),
+    details=CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
-      '- affected_items references items by their id (not list index).\n'
+      '- affected_items references items by their id, copied verbatim from '
+      'the candidate list below.\n'
       '- recommended_action is one of review / amend / no_op.\n'
-      '- routing_destination is one of market_ops / legal / it_metering.\n'
-      '  Pick the single PRIMARY team accountable for the change. '
-      'Secondary teams are not modelled in v1 (TDD §8.6).'
+      '- routing_destination is one of market_ops / legal / it_metering. '
+      'Pick the single PRIMARY team accountable for the change. Secondary '
+      'teams are not modelled in v1 (TDD §8.6).\n'
+      '- Report confidence as an integer 0-5 per the confidence rubric in '
+      'Details; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'change_description': change_summary,
@@ -85,6 +112,7 @@ def build_mapping_prompt(
       'project_candidates': project_list,
       'document_candidates': document_list,
     },
+    json_example=MAPPING_JSON_EXAMPLE,
   )
 
 

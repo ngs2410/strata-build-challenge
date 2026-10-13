@@ -8,6 +8,18 @@ TASK_NAME = 'citation_verify'
 
 STUB_RATIONALE = 'stub verifier: cited passage trivially supports claim at v1 scale'
 
+CITATION_VERIFY_JSON_EXAMPLE = """{
+  "verifications": [
+    {
+      "change_id": "<change id this verification applies to>",
+      "prior_citation_verified": <true|false|null>,
+      "prior_citation_rationale": "<quote the specific supporting phrase, or null>",
+      "new_citation_verified": <true|false|null>,
+      "new_citation_rationale": "<quote the specific supporting phrase, or null>"
+    }
+  ]
+}"""
+
 
 class CitationVerificationItem(BaseModel):
   model_config = ConfigDict(extra='forbid')
@@ -77,6 +89,7 @@ def build_citation_verify_prompt(
     inputs_dict={
       'claim': ('--- start of changes ---\n' + rendered_changes + '\n--- end of changes ---'),
     },
+    json_example=CITATION_VERIFY_JSON_EXAMPLE,
   )
 
 

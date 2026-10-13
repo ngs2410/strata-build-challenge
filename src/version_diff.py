@@ -5,8 +5,39 @@ from pydantic import BaseModel, ConfigDict
 from src.config import Change, Citation, ProceedingVersion
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
+from src.prompt_calibration import CHANGE_TYPE_RUBRIC, CONFIDENCE_LEVEL_RUBRIC
 
 TASK_NAME = 'version_diff'
+
+VERSION_DIFF_JSON_EXAMPLE = """{
+  "changes": [
+    {
+      "change_id": "<stable id for this change>",
+      "tenant_id": "<tenant id>",
+      "environment": "<environment>",
+      "proceeding_id": "<proceeding id>",
+      "change_type": "<added|removed|tightened|loosened|cosmetic>",
+      "description": "<one-sentence description of the semantic shift>",
+      "prior_citation": {
+        "passage_id": "<passage id from the prior version, or null if added>",
+        "start_offset": <int>,
+        "end_offset": <int>,
+        "verified": false,
+        "verification_rationale": "pending citation_verify stage"
+      },
+      "new_citation": {
+        "passage_id": "<passage id from the new version, or null if removed>",
+        "start_offset": <int>,
+        "end_offset": <int>,
+        "verified": false,
+        "verification_rationale": "pending citation_verify stage"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>",
+      "detected_at": "<ISO-8601 datetime>"
+    }
+  ]
+}"""
 
 
 class VersionDiffResponse(BaseModel):
@@ -45,12 +76,15 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       'passage in each version. You produce structured JSON output.'
     ),
     task=('Compare the prior and new versions below and return a list of material changes.'),
+    details=CHANGE_TYPE_RUBRIC + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     rubrics=(
       '- Classify each change as added / removed / tightened / loosened / '
-      'cosmetic.\n'
+      'cosmetic per the change-type rubric in Details.\n'
       '- Attach prior_citation and new_citation; set one to null when the '
       'change is added-only or removed-only.\n'
-      '- Pure rewording that preserves meaning is cosmetic, not material.'
+      '- Pure rewording that preserves meaning is cosmetic, not material.\n'
+      '- Report confidence as an integer 0-5 per the confidence rubric in '
+      'Details; set confidence_rationale naming the rubric level and why.'
     ),
     inputs_dict={
       'prior_version_text': (
@@ -60,6 +94,7 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
         '--- start of new version ---\n' + new_text + '\n--- end of new version ---'
       ),
     },
+    json_example=VERSION_DIFF_JSON_EXAMPLE,
   )
 
 

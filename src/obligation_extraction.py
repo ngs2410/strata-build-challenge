@@ -39,11 +39,6 @@ TASK_NAME = 'obligation_extraction'
 OBLIGATION_EXTRACTION_JSON_EXAMPLE = """{
   "extracted_obligations": [
     {
-      "extraction_id": "<stable id for this extraction>",
-      "tenant_id": "<tenant id>",
-      "environment": "<environment>",
-      "proceeding_id": "<proceeding id>",
-      "version_id": "<version id>",
       "obligation_type": "<reporting|operational|procedural|financial>",
       "summary": "<one-sentence summary of the obligation>",
       "full_text": "<verbatim obligation text from the passage>",
@@ -65,11 +60,6 @@ STUB_RATIONALE = (
 
 class LlmExtractedObligation(BaseModel):
   model_config = ConfigDict(extra='forbid')
-  extraction_id: str
-  tenant_id: str
-  environment: str
-  proceeding_id: str
-  version_id: str
   obligation_type: Literal['reporting', 'operational', 'procedural', 'financial']
   summary: str
   full_text: str
@@ -129,9 +119,20 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       'character-for-character from the cited passage. Do NOT paraphrase, '
       'summarise, or truncate mid-word. Do NOT count characters or emit '
       'numeric offsets — grounding is done deterministically by Python '
-      'after this call.\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric '
-      'above; set confidence_rationale naming the rubric level and why.'
+      'after this call.'
+    ),
+    field_intents=(
+      '- obligation_type: one of reporting / operational / procedural / '
+      'financial per the taxonomy above.\n'
+      '- summary: one-sentence summary of the obligation.\n'
+      '- full_text: verbatim obligation text copied from the passage.\n'
+      '- citation: LlmCitation with passage_id + citing_span (verbatim '
+      'supporting span from the cited passage).\n'
+      '- confidence: integer 0-5 per the confidence rubric above.\n'
+      '- confidence_rationale: one sentence naming the rubric level you '
+      'picked and why.\n'
+      '- The harness owns extraction_id, tenant_id, environment, '
+      'proceeding_id, and version_id — do NOT emit these fields.'
     ),
     inputs_dict={
       'passage_text': ('--- start of passage ---\n' + passage_text + '\n--- end of passage ---'),
@@ -152,11 +153,6 @@ def stub_obligation_extraction_response(params: dict) -> ObligationExtractionRes
   return ObligationExtractionResponse(
     extracted_obligations=(
       LlmExtractedObligation(
-        extraction_id=f'{version.proceeding_id}:{version.version_id}:ext-001',
-        tenant_id=version.tenant_id,
-        environment=version.environment,
-        proceeding_id=version.proceeding_id,
-        version_id=version.version_id,
         obligation_type='procedural',
         summary=('Aggregators must register each DER with the RTO/ISO prior to its participation.'),
         full_text=anchor.text,

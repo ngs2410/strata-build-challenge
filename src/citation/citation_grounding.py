@@ -35,6 +35,8 @@ Hard failure (raises `ValueError`):
     This is a prompt-engineering bug, not a run-time data issue.
 '''
 
+from datetime import datetime, timezone
+
 from src.citation.llm_citation import LlmCitation
 from src.config import (
   Change,
@@ -56,21 +58,22 @@ def ground_citations_for_changes(
   config = load_domain_config(prior.tenant_id, prior.environment)
   min_span = config.citation.min_citation_span_chars
   passages_by_id = _passages_by_id(prior, final)
+  now = datetime.now(timezone.utc)
   return [
     Change(
-      change_id=lc.change_id,
-      tenant_id=lc.tenant_id,
-      environment=lc.environment,
-      proceeding_id=lc.proceeding_id,
+      change_id=f'{prior.proceeding_id}:change-{index + 1:03d}',
+      tenant_id=prior.tenant_id,
+      environment=prior.environment,
+      proceeding_id=prior.proceeding_id,
       change_type=lc.change_type,
       description=lc.description,
       prior_citation=_resolve(lc.prior_citation, passages_by_id, min_span),
       new_citation=_resolve(lc.new_citation, passages_by_id, min_span),
       confidence=lc.confidence,
       confidence_rationale=lc.confidence_rationale,
-      detected_at=lc.detected_at,
+      detected_at=now,
     )
-    for lc in llm_changes
+    for index, lc in enumerate(llm_changes)
   ]
 
 
@@ -82,17 +85,17 @@ def ground_obligations(
   min_span = config.citation.min_citation_span_chars
   passages_by_id = {p.passage_id: p for p in version.passages}
   resolved: list[ExtractedObligation] = []
-  for lo in llm_obligations:
+  for index, lo in enumerate(llm_obligations):
     citation = _resolve(lo.citation, passages_by_id, min_span)
     if citation is None:
-      raise ValueError(f'obligation {lo.extraction_id} has no citation')
+      raise ValueError(f'extracted obligation at index {index} has no citation')
     resolved.append(
       ExtractedObligation(
-        extraction_id=lo.extraction_id,
-        tenant_id=lo.tenant_id,
-        environment=lo.environment,
-        proceeding_id=lo.proceeding_id,
-        version_id=lo.version_id,
+        extraction_id=f'{version.proceeding_id}:{version.version_id}:ext-{index + 1:03d}',
+        tenant_id=version.tenant_id,
+        environment=version.environment,
+        proceeding_id=version.proceeding_id,
+        version_id=version.version_id,
         obligation_type=lo.obligation_type,
         summary=lo.summary,
         full_text=lo.full_text,

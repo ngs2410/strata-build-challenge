@@ -38,7 +38,6 @@ tests and `--dry_run` exercise the end-to-end wiring without an API call.
 criteria, and known failure modes.
 '''
 
-from datetime import datetime, timezone
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -54,10 +53,6 @@ TASK_NAME = 'version_diff'
 VERSION_DIFF_JSON_EXAMPLE = """{
   "changes": [
     {
-      "change_id": "<stable id for this change>",
-      "tenant_id": "<tenant id>",
-      "environment": "<environment>",
-      "proceeding_id": "<proceeding id>",
       "change_type": "<added|removed|tightened|loosened|cosmetic>",
       "description": "<one-sentence description of the semantic shift>",
       "prior_citation": {
@@ -69,8 +64,7 @@ VERSION_DIFF_JSON_EXAMPLE = """{
         "citing_span": "<verbatim text copied character-for-character from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
-      "confidence_rationale": "<which rubric level you picked and why>",
-      "detected_at": "<ISO-8601 datetime>"
+      "confidence_rationale": "<which rubric level you picked and why>"
     }
   ]
 }
@@ -79,10 +73,6 @@ Also valid when change_type="added" — the whole prior_citation object is null:
 {
   "changes": [
     {
-      "change_id": "<stable id>",
-      "tenant_id": "<tenant id>",
-      "environment": "<environment>",
-      "proceeding_id": "<proceeding id>",
       "change_type": "added",
       "description": "<one-sentence description>",
       "prior_citation": null,
@@ -91,8 +81,7 @@ Also valid when change_type="added" — the whole prior_citation object is null:
         "citing_span": "<verbatim text span from the cited new passage>"
       },
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
-      "confidence_rationale": "<which rubric level you picked and why>",
-      "detected_at": "<ISO-8601 datetime>"
+      "confidence_rationale": "<which rubric level you picked and why>"
     }
   ]
 }
@@ -101,10 +90,6 @@ Also valid when change_type="removed" — the whole new_citation object is null:
 {
   "changes": [
     {
-      "change_id": "<stable id>",
-      "tenant_id": "<tenant id>",
-      "environment": "<environment>",
-      "proceeding_id": "<proceeding id>",
       "change_type": "removed",
       "description": "<one-sentence description>",
       "prior_citation": {
@@ -113,8 +98,7 @@ Also valid when change_type="removed" — the whole new_citation object is null:
       },
       "new_citation": null,
       "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
-      "confidence_rationale": "<which rubric level you picked and why>",
-      "detected_at": "<ISO-8601 datetime>"
+      "confidence_rationale": "<which rubric level you picked and why>"
     }
   ]
 }"""
@@ -122,17 +106,12 @@ Also valid when change_type="removed" — the whole new_citation object is null:
 
 class LlmChange(BaseModel):
   model_config = ConfigDict(extra='forbid')
-  change_id: str
-  tenant_id: str
-  environment: str
-  proceeding_id: str
   change_type: Literal['added', 'removed', 'tightened', 'loosened', 'cosmetic']
   description: str
   prior_citation: LlmCitation | None
   new_citation: LlmCitation | None
   confidence: int
   confidence_rationale: str
-  detected_at: datetime
 
 
 class VersionDiffResponse(BaseModel):
@@ -189,9 +168,22 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
       '- citing_span is the VERBATIM text copied character-for-character '
       "from the cited passage. Do NOT paraphrase, summarise, or truncate "
       'mid-word. Do NOT count characters or emit numeric offsets — grounding '
-      'is done deterministically by Python after this call.\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric '
-      'above; set confidence_rationale naming the rubric level and why.'
+      'is done deterministically by Python after this call.'
+    ),
+    field_intents=(
+      '- change_type: one of added / removed / tightened / loosened / '
+      'cosmetic per the change-type rubric above.\n'
+      '- description: one-sentence summary of the semantic shift between the '
+      'prior and new versions.\n'
+      '- prior_citation: an LlmCitation (passage_id + citing_span) pointing '
+      'at the span in the PRIOR version. null when change_type="added".\n'
+      '- new_citation: an LlmCitation pointing at the span in the NEW '
+      'version. null when change_type="removed".\n'
+      '- confidence: integer 0-5 per the confidence rubric above.\n'
+      '- confidence_rationale: one sentence naming the rubric level you '
+      'picked and why.\n'
+      '- The harness owns change_id, tenant_id, environment, proceeding_id, '
+      'and detected_at — do NOT emit these fields.'
     ),
     inputs_dict={
       'prior_version_text': (
@@ -208,16 +200,8 @@ def build_version_diff_prompt(prior: ProceedingVersion, final: ProceedingVersion
 def stub_version_diff_response(params: dict) -> VersionDiffResponse:
   prior = params['prior']
   final = params['final']
-  now = datetime.now(timezone.utc)
-  tenant_id = prior.tenant_id
-  environment = prior.environment
-  proceeding_id = prior.proceeding_id
   changes = (
     LlmChange(
-      change_id=f'{proceeding_id}:change-001',
-      tenant_id=tenant_id,
-      environment=environment,
-      proceeding_id=proceeding_id,
       change_type='loosened',
       description=(
         'Final Rule permits RTOs/ISOs to establish an aggregation minimum size up to '
@@ -230,13 +214,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Direct textual contrast between subsection (A) of NOPR and Final Rule — '
         'stub-generated against the sample excerpts.'
       ),
-      detected_at=now,
     ),
     LlmChange(
-      change_id=f'{proceeding_id}:change-002',
-      tenant_id=tenant_id,
-      environment=environment,
-      proceeding_id=proceeding_id,
       change_type='tightened',
       description=(
         'Final Rule requires aggregator registration at least 60 days before '
@@ -249,13 +228,8 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Subsection (B) adds the 60-day lead time in Final; stub-generated against '
         'the sample excerpts.'
       ),
-      detected_at=now,
     ),
     LlmChange(
-      change_id=f'{proceeding_id}:change-003',
-      tenant_id=tenant_id,
-      environment=environment,
-      proceeding_id=proceeding_id,
       change_type='added',
       description=(
         'Final Rule introduces a telemetry-feed requirement for aggregated resources '
@@ -268,7 +242,6 @@ def stub_version_diff_response(params: dict) -> VersionDiffResponse:
         'Final subsection (C) adds the telemetry obligation; stub-generated against '
         'the sample excerpts.'
       ),
-      detected_at=now,
     ),
   )
   return VersionDiffResponse(changes=changes)

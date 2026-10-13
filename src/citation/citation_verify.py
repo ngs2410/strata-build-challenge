@@ -48,7 +48,7 @@ STUB_RATIONALE = 'stub verifier: cited passage trivially supports claim at v1 sc
 CITATION_VERIFY_JSON_EXAMPLE = """{
   "verifications": [
     {
-      "change_id": "<change id this verification applies to>",
+      "change_index": <int 0-based index into the input change list>,
       "prior_citation_verified": <true|false|null>,
       "prior_citation_rationale": "<quote the specific supporting phrase, or null>",
       "new_citation_verified": <true|false|null>,
@@ -60,7 +60,7 @@ CITATION_VERIFY_JSON_EXAMPLE = """{
 
 class CitationVerificationItem(BaseModel):
   model_config = ConfigDict(extra='forbid')
-  change_id: str
+  change_index: int
   prior_citation_verified: bool | None
   prior_citation_rationale: str | None
   new_citation_verified: bool | None
@@ -110,8 +110,9 @@ def build_citation_verify_prompt(
     ),
     task=(
       'Verify every citation on each listed Change. Return one '
-      'CitationVerificationItem per Change (by change_id), with per-citation '
-      'verified booleans and short rationales.'
+      'CitationVerificationItem per Change, keyed by the 0-based change_index '
+      '(the "[0]", "[1]", … prefix on each change block in the Inputs section). '
+      'The harness resolves the index back to the Change identity after.'
     ),
     rubrics=(
       '- prior_citation_verified=True only when the prior passage text '
@@ -122,6 +123,19 @@ def build_citation_verify_prompt(
       'prior_citation_verified and prior_citation_rationale to null.\n'
       '- Same for new_citation when change_type="removed".\n'
       '- Rationale should quote the specific supporting phrase.'
+    ),
+    field_intents=(
+      '- change_index: 0-based index into the input change list (the "[N]" '
+      'prefix on each rendered change block). Must be a valid index into that '
+      'list.\n'
+      '- prior_citation_verified: true/false if the Change has a '
+      'prior_citation; null if the Change has no prior_citation (e.g. '
+      'change_type="added").\n'
+      '- prior_citation_rationale: short quoted supporting phrase if '
+      'verified=true; a one-sentence refutation if verified=false; null when '
+      'prior_citation_verified is null.\n'
+      '- new_citation_verified / new_citation_rationale: same pattern for '
+      'the new_citation.'
     ),
     inputs_dict={
       'claim': ('--- start of changes ---\n' + rendered_changes + '\n--- end of changes ---'),
@@ -138,12 +152,12 @@ def stub_citation_verify_response(params: dict) -> CitationVerificationResponse:
     passage.passage_id: passage for version in (prior, final) for passage in version.passages
   }
   items: list[CitationVerificationItem] = []
-  for change in changes:
+  for index, change in enumerate(changes):
     prior_v, prior_r = _stub_verify(change.prior_citation, passages_by_id)
     new_v, new_r = _stub_verify(change.new_citation, passages_by_id)
     items.append(
       CitationVerificationItem(
-        change_id=change.change_id,
+        change_index=index,
         prior_citation_verified=prior_v,
         prior_citation_rationale=prior_r,
         new_citation_verified=new_v,
@@ -174,12 +188,15 @@ def verify_citations(
     tenant_id=prior.tenant_id,
     environment=prior.environment,
   )
-  by_change_id = {item.change_id: item for item in response.verifications}
+  by_change_index = {item.change_index: item for item in response.verifications}
   merged: list[Change] = []
-  for change in changes:
-    verification = by_change_id.get(change.change_id)
+  for index, change in enumerate(changes):
+    verification = by_change_index.get(index)
     if verification is None:
-      raise ValueError(f'citation_verify returned no verification for change_id={change.change_id}')
+      raise ValueError(
+        f'citation_verify returned no verification for change_index={index} '
+        f'(change_id={change.change_id})'
+      )
     merged.append(
       change.model_copy(
         update={
@@ -200,7 +217,7 @@ def verify_citations(
 
 
 def _render_change_block(index: int, change: Change, passages_by_id: dict) -> str:
-  lines = [f'[{index}] change_id={change.change_id}']
+  lines = [f'[{index}]']
   lines.append(f'change_type: {change.change_type}')
   lines.append(f'description: {change.description}')
   lines.append(_render_citation('prior', change.prior_citation, passages_by_id))

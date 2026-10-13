@@ -75,17 +75,12 @@ def _change(change_type, prior_citation=None, new_citation=None):
 
 def _llm_change(change_type, prior_citation=None, new_citation=None):
   return LlmChange(
-    change_id='c-1',
-    tenant_id='verdant_grid',
-    environment='prod',
-    proceeding_id='proc',
     change_type=change_type,
     description='d',
     prior_citation=prior_citation,
     new_citation=new_citation,
     confidence=4,
     confidence_rationale='r',
-    detected_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
   )
 
 

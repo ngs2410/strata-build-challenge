@@ -158,10 +158,20 @@ def build_mapping_prompt(
       'project_candidates, or document_candidates per item_type). Count '
       'the "[0]" / "[1]" / ... prefixes. Must be a valid index into that '
       'list.\n'
+      '- affected_items[*].match_confidence: integer 0-5 per the confidence '
+      'rubric below.\n'
+      '- affected_items[*].match_rationale: one sentence naming the specific '
+      'overlap between the change and this item.\n'
       '- recommended_action: one of review / amend / no_op.\n'
       '- routing_destination: one of market_ops / legal / it_metering — '
       'the single PRIMARY team accountable (TDD §8.6 scope limit).\n'
-      '- confidence: integer 0-5 per the rubric in Rubrics.'
+      '- confidence: integer 0-5 per the confidence rubric below (overall '
+      'mapping confidence, not per-item).\n'
+      '- confidence_rationale: one sentence naming the rubric level and why.\n'
+      '- rationale: one paragraph summarising WHY this change maps to these '
+      'items and this team.\n'
+      '- The harness owns mapping_id, tenant_id, environment, and change_id '
+      '— do NOT emit these fields.'
     ),
     rubrics=(
       CONFIDENCE_LEVEL_RUBRIC

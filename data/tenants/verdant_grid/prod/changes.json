@@ -4,25 +4,25 @@
     "tenant_id": "verdant_grid",
     "environment": "prod",
     "proceeding_id": "ferc-order-2222",
-    "change_type": "loosened",
-    "description": "Final Rule permits RTOs/ISOs to establish an aggregation minimum size up to 100 kW; NOPR explicitly disallowed any minimum size.",
+    "change_type": "tightened",
+    "description": "The RTO/ISO may impose a minimum aggregated-resource size (up to 100 kW), whereas the registration process previously could not include any minimum size requirement.",
     "prior_citation": {
       "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p1",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 235,
+      "end_offset": 308,
       "verified": true,
-      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+      "verification_rationale": "\"shall not include a minimum size\nrequirement for the aggregated resources\""
     },
     "new_citation": {
       "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p1",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 269,
+      "end_offset": 366,
       "verified": true,
-      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+      "verification_rationale": "\"may\nestablish a minimum size requirement for the aggregated resources that\ndoes not exceed 100 kW\""
     },
     "confidence": 4,
-    "confidence_rationale": "Direct textual contrast between subsection (A) of NOPR and Final Rule — stub-generated against the sample excerpts.",
-    "detected_at": "2026-10-14T01:51:50.406999Z"
+    "confidence_rationale": "Strongly supported: the prior text forbids any minimum-size requirement, and the new text allows one (explicit 100 kW cap), implying added size constraint for aggregators.",
+    "detected_at": "2026-10-14T01:55:13.259200Z"
   },
   {
     "change_id": "ferc-order-2222:change-002",
@@ -30,42 +30,48 @@
     "environment": "prod",
     "proceeding_id": "ferc-order-2222",
     "change_type": "tightened",
-    "description": "Final Rule requires aggregator registration at least 60 days before participation; NOPR had no lead-time requirement.",
+    "description": "The aggregator must register each distributed energy resource at least 60 days before it participates and must include the point of interconnection in the registration details.",
     "prior_citation": {
       "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p2",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 179,
+      "end_offset": 316,
       "verified": true,
-      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+      "verification_rationale": "\"The registration shall\ninclude the physical location of each distributed energy resource and\nits physical and operational characteristics\""
     },
     "new_citation": {
       "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p2",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 178,
+      "end_offset": 435,
       "verified": true,
-      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+      "verification_rationale": "\"at least 60 days before the\ndistributed energy resource participates in the aggregation. The\nregistration shall include the physical location, the point of\ninterconnection, and the physical and operational characteristics\""
     },
-    "confidence": 4,
-    "confidence_rationale": "Subsection (B) adds the 60-day lead time in Final; stub-generated against the sample excerpts.",
-    "detected_at": "2026-10-14T01:51:50.406999Z"
+    "confidence": 3,
+    "confidence_rationale": "Reasonable: the new text clearly adds (i) a 60-day timing requirement and (ii) a point-of-interconnection field, but the prior timing absence is inferred from not being stated in the provided prior passage.",
+    "detected_at": "2026-10-14T01:55:13.259200Z"
   },
   {
     "change_id": "ferc-order-2222:change-003",
     "tenant_id": "verdant_grid",
     "environment": "prod",
     "proceeding_id": "ferc-order-2222",
-    "change_type": "added",
-    "description": "Final Rule introduces a telemetry-feed requirement for aggregated resources rated ≥100 kW; NOPR had no telemetry requirement.",
-    "prior_citation": null,
+    "change_type": "tightened",
+    "description": "In addition to providing information to confirm capability, the aggregator must provide a telemetry feed for aggregated resources rated at or above 100 kW.",
+    "prior_citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p3",
+      "start_offset": 19,
+      "end_offset": 221,
+      "verified": true,
+      "verification_rationale": "\"shall provide the Regional Transmission Organization\nor Independent System Operator with information sufficient to permit\nthe Regional Transmission Organization or Independent System Operator\nto confirm\""
+    },
     "new_citation": {
       "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p3",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 342,
+      "end_offset": 426,
       "verified": true,
-      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+      "verification_rationale": "\"and shall\nprovide a telemetry feed for aggregated resources rated at or above 100\nkW\""
     },
-    "confidence": 5,
-    "confidence_rationale": "Final subsection (C) adds the telemetry obligation; stub-generated against the sample excerpts.",
-    "detected_at": "2026-10-14T01:51:50.406999Z"
+    "confidence": 4,
+    "confidence_rationale": "Strongly supported: the telemetry-feed requirement is explicitly added and is an added compliance deliverable for aggregators (tightening rather than a wholly standalone new obligation).",
+    "detected_at": "2026-10-14T01:55:13.259200Z"
   }
 ]

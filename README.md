@@ -206,30 +206,36 @@ the `/queue` and `/audit` pages read. So after `git clone` you can
 run `python -m scripts.main_review` and the UI is populated
 immediately — no API key, no pipeline run.
 
-The snapshot is a `--stub_all` run — every LLM task was dispatched
-through the deterministic
-[`StubBackend`](src/backends/stub_backend.py) so the fixture is
-reproducible from the committed seed data (proceedings text,
-company context, gold set) without burning tokens. The mapping /
-version-diff / extraction content is therefore stub-generated and
-simpler than a real LLM would produce; see
-[the Known limitations section](#known-limitations) for the
-small-model calibration caveats that apply to real runs.
+The snapshot is a **real-LLM run against `openai://gpt-5.4-nano`**
+over the committed seed data (proceedings text, company context),
+with every call cached in `.model_cache/` so a regen is free when
+prompts haven't changed. The content reflects what the actual model
+produced; the small-model calibration caveats in
+[the Known limitations section](#known-limitations) are what the
+reviewer actually sees.
 
-**Regenerate the snapshot** after a schema change or a prompt /
-stub tweak:
+**Regenerate the snapshot** after a schema or prompt change (set
+`OPENAI_API_KEY` in `.env` first):
 
 ```
 rm data/tenants/verdant_grid/prod/*.json data/tenants/verdant_grid/prod/*.jsonl
-env3.12/bin/python -m scripts.main_detect_changes --stub_all
+env3.12/bin/python -m scripts.main_detect_changes
 git add data/tenants/verdant_grid/prod/
 ```
 
-Running the pipeline against a real OpenAI backend (drop the
-`--stub_all` flag; set `OPENAI_API_KEY` first) overwrites the
-snapshot with actual LLM outputs. Commit those instead if you want
-the demo to reflect real model behaviour — but be aware they will
-drift as prompts change.
+Fresh LLM calls happen only for prompts whose exact rendered text
+changed since the last cached run; everything else hits the
+diskcache. Typical regen cost after a prompt tweak: ~$0.001-0.005
+and a few seconds. A full cold regen costs ~$0.005 end-to-end.
+
+**Air-gapped regen** — if you want to rebuild the snapshot without
+an API key (CI, offline review, test fixture regen), the
+`--stub_all` flag on `scripts/main_detect_changes.py` pins every
+task to `stub://` (same monkey-patch as the conftest
+`stub_all_task_configs` fixture). The resulting snapshot is
+reproducible from seed data but shows deterministic stub content
+rather than real LLM content; the UI shape is the same but the
+reasoning is simpler.
 
 The `.gitignore` has explicit un-ignore (`!…`) lines for the
 `verdant_grid/prod/*.json` + `audit_log.jsonl` paths; every other

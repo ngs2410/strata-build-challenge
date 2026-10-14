@@ -6,17 +6,55 @@
     "proceeding_id": "ferc-order-2222",
     "version_id": "nopr-2019-11",
     "obligation_type": "procedural",
-    "summary": "Aggregators must register each DER with the RTO/ISO prior to its participation.",
-    "full_text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\naggregator registration process shall not include a minimum size\nrequirement for the aggregated resources.",
+    "summary": "The aggregator’s registration process must not include a minimum size requirement for aggregated resources.",
+    "full_text": "The aggregator registration process shall not include a minimum size requirement for the aggregated resources.",
     "citation": {
       "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p1",
-      "start_offset": 0,
-      "end_offset": 200,
+      "start_offset": 235,
+      "end_offset": 308,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 5,
+    "confidence_rationale": "The duty is stated verbatim as a clear requirement on the aggregator’s process."
+  },
+  {
+    "extraction_id": "ferc-order-2222:nopr-2019-11:ext-002",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "nopr-2019-11",
+    "obligation_type": "procedural",
+    "summary": "The aggregator must register each distributed energy resource included in the aggregation with the RTO/ISO, and the registration must include required location and characteristics information.",
+    "full_text": "The aggregator shall register each distributed energy resource that is included in the aggregation with the Regional Transmission Organization or Independent System Operator. The registration shall include the physical location of each distributed energy resource and its physical and operational characteristics.",
+    "citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p2",
+      "start_offset": 19,
+      "end_offset": 177,
       "verified": false,
       "verification_rationale": "pending citation_verify stage"
     },
     "confidence": 4,
-    "confidence_rationale": "stub extraction: hand-constructed example obligation covering the registration lead-time clause; real impl calls obligation_extraction LLM task"
+    "confidence_rationale": "Clearly a registration/process duty; extracting only the core verb clause is supported by the content-specification rule."
+  },
+  {
+    "extraction_id": "ferc-order-2222:nopr-2019-11:ext-003",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "nopr-2019-11",
+    "obligation_type": "procedural",
+    "summary": "The aggregator must provide the RTO/ISO with sufficient information to allow it to confirm the aggregation resources have the capability to provide the services the aggregation is bidding for.",
+    "full_text": "The aggregator shall provide the Regional Transmission Organization or Independent System Operator with information sufficient to permit the Regional Transmission Organization or Independent System Operator to confirm that the resources in the aggregation have the capability to provide the services for which the aggregation is bidding.",
+    "citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p3",
+      "start_offset": 19,
+      "end_offset": 140,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 3,
+    "confidence_rationale": "The obligation text clearly requires providing information, but the taxonomy classification as procedural vs reporting depends on how the information is timed relative to bidding/registration."
   },
   {
     "extraction_id": "ferc-order-2222:final-2020-09:ext-001",
@@ -25,16 +63,54 @@
     "proceeding_id": "ferc-order-2222",
     "version_id": "final-2020-09",
     "obligation_type": "procedural",
-    "summary": "Aggregators must register each DER with the RTO/ISO prior to its participation.",
-    "full_text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\nRegional Transmission Organization or Independent System Operator may\nestablish a minimum size requirement for the aggregated resources that\ndoes not exceed 100 kW.",
+    "summary": "The aggregator must register each distributed energy resource in the aggregation with the RTO/ISO at least 60 days before it participates, and ensure the registration includes required technical details.",
+    "full_text": "The aggregator shall register each distributed energy resource that is included in the aggregation with the Regional Transmission Organization or Independent System Operator at least 60 days before the distributed energy resource participates in the aggregation. The registration shall include the physical location, the point of interconnection, and the physical and operational characteristics of each distributed energy resource.",
     "citation": {
-      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p1",
-      "start_offset": 0,
-      "end_offset": 200,
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p2",
+      "start_offset": 19,
+      "end_offset": 265,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 5,
+    "confidence_rationale": "The duty, timing, and scope are stated verbatim and unambiguously, with the content requirement part of the same registration obligation."
+  },
+  {
+    "extraction_id": "ferc-order-2222:final-2020-09:ext-002",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "final-2020-09",
+    "obligation_type": "reporting",
+    "summary": "The aggregator must provide the RTO/ISO information sufficient to confirm that the aggregated resources can provide the services the aggregation is bidding for.",
+    "full_text": "The aggregator shall provide the Regional Transmission Organization or Independent System Operator with information sufficient to permit the Regional Transmission Organization or Independent System Operator to confirm that the resources in the aggregation have the capability to provide the services for which the aggregation is bidding, and shall provide a telemetry feed for aggregated resources rated at or above 100 kW.",
+    "citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p3",
+      "start_offset": 19,
+      "end_offset": 340,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 3,
+    "confidence_rationale": "The obligation clearly requires providing information to enable confirmation, but whether it is best classified as reporting versus procedural is somewhat judgement-based."
+  },
+  {
+    "extraction_id": "ferc-order-2222:final-2020-09:ext-003",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "final-2020-09",
+    "obligation_type": "operational",
+    "summary": "The aggregator must provide a telemetry feed for aggregated resources rated at or above 100 kW.",
+    "full_text": "The aggregator shall provide the Regional Transmission Organization or Independent System Operator with information sufficient to permit the Regional Transmission Organization or Independent System Operator to confirm that the resources in the aggregation have the capability to provide the services for which the aggregation is bidding, and shall provide a telemetry feed for aggregated resources rated at or above 100 kW.",
+    "citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p3",
+      "start_offset": 346,
+      "end_offset": 426,
       "verified": false,
       "verification_rationale": "pending citation_verify stage"
     },
     "confidence": 4,
-    "confidence_rationale": "stub extraction: hand-constructed example obligation covering the registration lead-time clause; real impl calls obligation_extraction LLM task"
+    "confidence_rationale": "Providing a telemetry feed is an ongoing operating requirement, though the passage does not specify an explicit cadence or timing beyond the feed itself."
   }
 ]

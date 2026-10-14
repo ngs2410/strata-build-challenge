@@ -4,26 +4,26 @@
     "tenant_id": "verdant_grid",
     "environment": "prod",
     "mapping_id": "ferc-order-2222:change-001:mapping",
-    "priority": 42,
+    "priority": 20,
     "status": "pending",
-    "created_at": "2026-10-14T01:51:50.411777Z"
+    "created_at": "2026-10-14T01:55:28.915879Z"
   },
   {
     "review_item_id": "ferc-order-2222:change-002:mapping:review",
     "tenant_id": "verdant_grid",
     "environment": "prod",
     "mapping_id": "ferc-order-2222:change-002:mapping",
-    "priority": 42,
+    "priority": 16,
     "status": "pending",
-    "created_at": "2026-10-14T01:51:50.411789Z"
+    "created_at": "2026-10-14T01:55:28.915890Z"
   },
   {
     "review_item_id": "ferc-order-2222:change-003:mapping:review",
     "tenant_id": "verdant_grid",
     "environment": "prod",
     "mapping_id": "ferc-order-2222:change-003:mapping",
-    "priority": 56,
+    "priority": 16,
     "status": "pending",
-    "created_at": "2026-10-14T01:51:50.411794Z"
+    "created_at": "2026-10-14T01:55:28.915895Z"
   }
 ]

@@ -7,112 +7,40 @@
     "affected_items": [
       {
         "item_type": "obligation",
-        "item_id": "VG-OBL-DER-REG-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-TEL-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
         "item_id": "VG-OBL-DER-SIZE-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
+        "match_confidence": 5,
+        "match_rationale": "The change introduces/permits RTO/ISO minimum aggregated-resource size thresholds in the registration process, which the obligation explicitly requires honoring.",
         "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-METER-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-SETTLEMENT-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
         "proposed_route": "market_ops"
       },
       {
         "item_type": "document",
         "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
+        "match_confidence": 4,
+        "match_rationale": "The DER Aggregation Operating Procedure should incorporate the updated registration/participation constraint reflecting RTO/ISO minimum aggregation size requirements.",
         "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+        "match_confidence": 4,
+        "match_rationale": "The MISO DER Aggregation Compliance Plan must be updated to reflect the tightened rule allowing minimum aggregation-size thresholds in registration.",
+        "proposed_action": "amend",
         "proposed_route": "legal"
       },
       {
         "item_type": "document",
         "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
         "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
+        "match_rationale": "The draft tariff filing for DER aggregation compliance may need updates to align tariff-described registration/aggregation eligibility with the new minimum-size allowance.",
         "proposed_action": "review",
         "proposed_route": "legal"
       }
     ],
-    "confidence": 3,
-    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
-    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+    "confidence": 4,
+    "confidence_rationale": "The change is explicitly about introducing minimum aggregated-resource size in registration up to 100 kW, directly matching the size-threshold obligation and plausibly requiring updates to the core operating procedure and compliance artifacts.",
+    "rationale": "The tightened requirement specifically affects how DER aggregations qualify during the registration/participation process by allowing the RTO/ISO to impose minimum aggregated-resource sizes. This directly impacts the obligation that requires honoring RTO-set minimum aggregation size thresholds, and it likely flows into the DER Aggregation Operating Procedure and the company’s formal compliance policy and external regulatory filing artifacts describing/justifying aggregation registration and eligibility constraints."
   },
   {
     "mapping_id": "ferc-order-2222:change-002:mapping",
@@ -123,111 +51,31 @@
       {
         "item_type": "obligation",
         "item_id": "VG-OBL-DER-REG-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
+        "match_confidence": 5,
+        "match_rationale": "The change tightens DER registration timing and requires including the point of interconnection details, which directly updates the obligation to register each DER in an aggregation with MISO before market participation.",
         "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-TEL-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-SIZE-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-METER-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-SETTLEMENT-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
         "proposed_route": "market_ops"
       },
       {
         "item_type": "document",
         "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
         "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
+        "match_rationale": "The DER Aggregation Operating Procedure is the process artifact that would need to reflect the new 60-day registration requirement and the required point-of-interconnection information in registration details.",
         "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
+        "proposed_route": "market_ops"
       },
       {
         "item_type": "document",
         "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
         "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
+        "match_rationale": "The MISO DER Aggregation Compliance Plan is a policy/compliance artifact that would need to incorporate the tightened DER registration timing and inclusion of point-of-interconnection details.",
         "proposed_action": "review",
         "proposed_route": "legal"
       }
     ],
-    "confidence": 3,
-    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
-    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+    "confidence": 4,
+    "confidence_rationale": "High confidence for the specific registration obligation, with reasonable (but not fully explicit) linkage for the operating procedure and compliance plan.",
+    "rationale": "The change creates concrete new requirements for DER registration prior to participation (minimum 60-day lead time and mandatory point-of-interconnection data). This directly amends the DER registration procedural obligation for MISO market participation. The Operating Procedure and the MISO compliance plan are the likely process/policy documents that must be updated to align internal execution and compliance framing with the new registration parameters, so they are included for review rather than automatic amendment."
   },
   {
     "mapping_id": "ferc-order-2222:change-003:mapping",
@@ -237,111 +85,31 @@
     "affected_items": [
       {
         "item_type": "obligation",
-        "item_id": "VG-OBL-DER-REG-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
         "item_id": "VG-OBL-DER-TEL-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
+        "match_confidence": 5,
+        "match_rationale": "The change tightens the requirement to provide a telemetry feed for aggregated resources rated at or above 100 kW, which directly updates the obligation to maintain the aggregated DER telemetry feed.",
         "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-SIZE-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-METER-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "obligation",
-        "item_id": "VG-OBL-DER-SETTLEMENT-01",
-        "match_confidence": 4,
-        "match_rationale": "source_authority references ferc-order-2222",
-        "proposed_action": "amend",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
+        "proposed_route": "it_metering"
       },
       {
         "item_type": "project",
         "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
+        "match_confidence": 4,
+        "match_rationale": "The AMI telemetry upgrade project is a concrete candidate to implement the tightened telemetry-feed requirement for >=100 kW aggregated resources.",
         "proposed_action": "review",
-        "proposed_route": "market_ops"
-      },
-      {
-        "item_type": "project",
-        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
-        "match_confidence": 3,
-        "match_rationale": "project relates to an obligation affected by this change",
-        "proposed_action": "review",
-        "proposed_route": "market_ops"
+        "proposed_route": "it_metering"
       },
       {
         "item_type": "document",
         "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
-      },
-      {
-        "item_type": "document",
-        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
-        "match_confidence": 3,
-        "match_rationale": "document title/summary references DER",
-        "proposed_action": "review",
-        "proposed_route": "legal"
+        "match_confidence": 4,
+        "match_rationale": "The DER Aggregation Operating Procedure should be updated to reflect the tightened telemetry-feed requirement for aggregated resources rated at or above 100 kW.",
+        "proposed_action": "amend",
+        "proposed_route": "it_metering"
       }
     ],
     "confidence": 4,
-    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
-    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+    "confidence_rationale": "High-confidence mapping because the change explicitly tightens an aggregated-resource telemetry-feed requirement for >=100 kW, which aligns directly with the telemetry-feed obligation and plausibly with the telemetry procedure/project.",
+    "rationale": "The tightened change adds/strengthens a specific compliance parameter: aggregators must provide a telemetry feed for aggregated resources rated at or above 100 kW. This substantively impacts the telemetry-feed obligation (owned by it_metering), and it is likely to require corresponding updates to the operating procedure and implementation work under the AMI telemetry upgrade project."
   }
 ]

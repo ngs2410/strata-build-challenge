@@ -341,6 +341,13 @@ class Document(BaseModel):
 _Source: `Obligation` [`src/config.py` L103-L113](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L103-L113), `Project` [`src/config.py` L116-L125](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L116-L125), `Document` [`src/config.py` L128-L138](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L128-L138). Seed data: [`data/tenants/verdant_grid/company_context.json`](https://github.com/ngs2410/strata-build-challenge/blob/main/data/tenants/verdant_grid/company_context.json)._
 
 **Decisions.**
+- **`Obligation` here is tenant-side — distinct from
+  `ExtractedObligation` (§3.5).** Tenant commitment loaded from
+  `company_context.json`, versus the regulator-side claim the Extract
+  stage lifts from a NOPR / Final Rule passage. v1 Mapping consumes
+  `Change → (Obligation, Project, Document)`; `ExtractedObligation`s
+  are produced for eval and reserved for future regulator↔tenant
+  obligation mapping, not fed into Mapping.
 - **Three peer models, not one `CompanyThing`.** Different schemas,
   different owners, different downstream treatment in Mapping. Collapsing
   them loses semantic signal and makes the review UI ambiguous ("what

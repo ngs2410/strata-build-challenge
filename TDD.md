@@ -836,6 +836,15 @@ _Source: [`src/obligation_extraction.py`](https://github.com/ngs2410/strata-buil
   loop.
 
 **Decisions.**
+- **`ExtractedObligation`s are not consumed by downstream pipeline
+  stages in v1.** Mapping (§3.6) consumes tenant-side `Obligation`s
+  (§2.4), not these regulator-side extractions — the pipeline jumps
+  `Change → (Obligation, Project, Document)` and leaves the
+  extractions as a parallel artefact persisted via
+  `extracted_obligation_store`. Kept because (a) the eval harness
+  measures extraction precision/recall against the gold set (§5), and
+  (b) regulator-obligation ↔ tenant-obligation matching is a reserved
+  post-wedge extension.
 - **Structured extraction with Pydantic Literals** over free-text +
   post-parse. Schema is enforced by OpenAI structured outputs and by
   Pydantic; no parsing step; no "the model said 'reporting' sometimes

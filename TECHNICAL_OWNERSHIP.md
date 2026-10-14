@@ -323,6 +323,16 @@ training loop, and Jev tier are production work, not v1 scope.
 
 ## Q5. The AI part at mechanism level — four tasks, what each receives, what it emits, one thing it gets wrong
 
+Captured `--confirm_llm` output for each task — the fully-rendered
+system + user prompt and the model's parsed response — is committed
+verbatim under [`docs/prompt-examples/`](docs/prompt-examples):
+[`version_diff.txt`](docs/prompt-examples/version_diff.txt),
+[`citation_verify.txt`](docs/prompt-examples/citation_verify.txt),
+[`obligation_extraction.txt`](docs/prompt-examples/obligation_extraction.txt),
+[`mapping.txt`](docs/prompt-examples/mapping.txt). Every "Receives"
+and "Emits" claim below can be checked against those files without
+running the pipeline.
+
 ### version_diff
 
 - **Receives**: prior proceeding text + new proceeding text,

@@ -1310,6 +1310,11 @@ _Source: `PromptSpec` + `CallSpec` dataclasses in [`src/llm.py`](https://github.
   `CONFIDENCE_LEVEL_RUBRIC`, `CHANGE_TYPE_RUBRIC`) is built
   programmatically from a data source (PROMPT_CONVENTIONS.md §10), not
   copy-pasted.
+- Captured `--confirm_llm` output for each task — the fully-rendered
+  prompt + parsed response — is committed verbatim under
+  [`docs/prompt-examples/`](https://github.com/ngs2410/strata-build-challenge/tree/main/docs/prompt-examples)
+  (one file per task). Reviewers can see what the model actually
+  receives and emits without running the pipeline.
 
 **Production.**
 - **Per-`(regulator, client)` prompt composition.** v1 bakes the

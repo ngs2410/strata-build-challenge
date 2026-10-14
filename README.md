@@ -166,6 +166,14 @@ and emits for `version_diff`, `citation_verify`,
 run is still fast; a cold-cache run with `--confirm_llm` typically
 has 7 pauses matching the 7 LLM calls (see count below).
 
+For reviewers who prefer not to run the pipeline, the
+fully-rendered prompt + parsed response for each of the four LLM
+tasks is captured verbatim under
+[`docs/prompt-examples/`](docs/prompt-examples) — one file per
+task (`version_diff.txt`, `citation_verify.txt`,
+`obligation_extraction.txt`, `mapping.txt`), copied straight from a
+`--confirm_llm` run against the Verdant Grid fixture.
+
 This drives [`scripts/main_detect_changes.py`](scripts/main_detect_changes.py)
 through [`src/pipeline.py`](src/pipeline.py) — the full 6-stage
 pipeline ([TDD §3](TDD.md#3-the-core-pipeline)) against the FERC
@@ -377,6 +385,9 @@ tests/                        Pytest tests (network-free; stub backend)
 docs/
   eval-results/               Committed eval-report markdowns + reading guide
                               (regenerate via `make eval-report`)
+  prompt-examples/            Captured --confirm_llm output per LLM task
+                              (version_diff, citation_verify,
+                              obligation_extraction, mapping)
 images/                       Screenshots embedded in README (review queue, audit log)
 ```
 

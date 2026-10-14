@@ -212,10 +212,9 @@ run `python -m scripts.main_review` and the UI is populated
 immediately — no API key, no pipeline run.
 
 The snapshot is a **real-LLM run against `openai://gpt-5.4-nano`**
-over the committed seed data (proceedings text, company context),
-with every call cached in `.model_cache/` so a regen is free when
-prompts haven't changed. The content reflects what the actual model
-produced; the small-model calibration caveats in
+over the committed seed data (proceedings text, company context).
+The content reflects what the actual model produced; the small-model
+calibration caveats in
 [the Known limitations section](#known-limitations) are what the
 reviewer actually sees.
 
@@ -228,10 +227,12 @@ env3.12/bin/python -m scripts.main_detect_changes
 git add data/tenants/verdant_grid/prod/
 ```
 
-Fresh LLM calls happen only for prompts whose exact rendered text
-changed since the last cached run; everything else hits the
-diskcache. Typical regen cost after a prompt tweak: ~$0.001-0.005
-and a few seconds. A full cold regen costs ~$0.005 end-to-end.
+A full regen makes ~9 LLM calls (one version_diff, one
+citation_verify, two obligation_extraction, three mapping, one
+each of the pipeline bookkeeping tasks) at gpt-5.4-nano pricing —
+roughly $0.005 end-to-end from a cold `.model_cache/`. Subsequent
+regens within the same working directory hit the local diskcache
+and are mostly free, but a fresh `git clone` starts with no cache.
 
 **Air-gapped regen** — if you want to rebuild the snapshot without
 an API key (CI, offline review, test fixture regen), the

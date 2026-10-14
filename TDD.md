@@ -1311,10 +1311,34 @@ _Source: `PromptSpec` + `CallSpec` dataclasses in [`src/llm.py`](https://github.
   copy-pasted.
 
 **Production.**
+- **Per-`(regulator, client)` prompt composition.** v1 bakes the
+  regulator/client assumptions directly into shared constants in
+  `src/prompt_calibration.py`: `REGULATED_ENTITY_PERSPECTIVE` encodes
+  the "FERC-regulated utility" reading stance,
+  `OBLIGATION_TAXONOMY_REFERENCE` uses four utility-oriented
+  obligation types, and `ROUTING_DESTINATION_GLOSSARY` hard-codes
+  Verdant's three internal teams (Market Ops / Legal / IT &
+  Metering). Expansion to a second industry (SEC → brokerage, HHS →
+  hospital, FDA → device maker, per PRD §5) or to a
+  differently-structured client in the same industry (a utility with
+  a Rates team distinct from Market Ops; a counsel-outsourced Legal
+  function, per PRD §7.5) requires factoring these pieces out of
+  shared code and into a **library of composable prompt components**
+  — regulator-side (section-path format, docket shape,
+  draft-vs-final cycle naming, authority-doc structure), client-side
+  (obligation-type leaves, routing destinations, authority sources,
+  team glossary), task-shared (change-type taxonomy, confidence
+  rubric). Each `(regulator, client)` pair picks its components; the
+  prompt builder composes them into the final `PromptSpec`. Storage
+  shape: pluggable per-pair component overrides in `DomainConfig`
+  (or a sibling `PromptComponentConfig`), with the base skeleton
+  staying shared across tenants.
 - Prompt versioning in `DomainConfig` so A/B tests across prompt
   versions are a config change, not a code deploy.
-- Prompt-tuning harness (grid search or Optuna over wording/rubric
-  variations) measured against the gold set.
+- Prompt-tuning harness (grid search or Optuna over wording / rubric
+  variations) measured against the gold set, scoped per
+  `(regulator, client)` pair over its selected components rather
+  than monolithic prompt text.
 - Full prompt + response sampled and logged per LLM call for post-hoc
   analysis.
 

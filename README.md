@@ -105,7 +105,7 @@ pytest tests/
 The suite is network-free (an autouse fixture in
 [`tests/conftest.py`](tests/conftest.py) rewrites every LLM task to a
 local [`stub://` backend](src/backends/stub_backend.py)) and runs in
-about 1.5 seconds. Expect 124 tests to pass. Test authoring rules
+about 2 seconds. Expect 185 tests to pass. Test authoring rules
 live in [TEST_QUALITY.md](TEST_QUALITY.md).
 
 Also useful:
@@ -146,9 +146,10 @@ Verdant Grid's seeded
 - `audit_log.jsonl` — append-only audit of every state transition
   ([TDD §2.7](TDD.md#27-auditevent)).
 
-Expect ~20 LLM calls per cold-cache run; ~30s wall-clock. The
-[`ModelCaller`](TDD.md#41-llm-dispatch-modelcaller) uses `diskcache`
-under `.model_cache/` so subsequent runs are <1s.
+Expect ~7 LLM calls per cold-cache run (1 version_diff + 1
+citation_verify + 2 obligation_extraction + 3 mapping); ~15s
+wall-clock. The [`ModelCaller`](TDD.md#41-llm-dispatch-modelcaller)
+uses `diskcache` under `.model_cache/` so subsequent runs are <1s.
 
 Script flags (all optional):
 
@@ -340,9 +341,10 @@ file + line range for its topic — see [TDD.md](TDD.md).
   [TDD §8.6](TDD.md#86-multi-reviewer-routing) cover the v2 shift to
   primary + CC routing.
 - **LLM-per-pair mapping does not scale beyond the v1 wedge.** The
-  current architecture runs an LLM call per candidate (change, item)
-  pair. At the demo scale (one tenant, one subsection, 16-item
-  context) this is ~20 LLM calls per run and costs cents. A
+  current architecture runs an LLM call per Change-level mapping
+  (which sees the full candidate list and emits per-item proposals).
+  At the demo scale (one tenant, one subsection, 16-item context)
+  this is ~7 LLM calls per run and costs cents. A
   production deployment hits a different regime: 600-page
   regulator orders, 100+ proceedings per year per regulator, 10+
   customers of the same regulator across multiple industries, 1000+

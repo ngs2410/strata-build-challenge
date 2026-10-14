@@ -56,7 +56,7 @@ That capability is not a search tool and not an alert feed. It is a workspace th
 
 ## 3. The first change-to-action wedge workflow
 
-**Scope for v1 (the build challenge submission):** FERC Order 2222, a single short subsection on how aggregators must register with wholesale-market operators. Two versions: the draft text (the NOPR, issued November 2019 in Docket RM18-9) and the final text (Order 2222, issued September 2020). We extract roughly 8 specific obligations from this one subsection — not the whole 660-page rule.
+**Scope for v1 (the build challenge submission):** FERC Order 2222, a single short subsection on how aggregators must register with wholesale-market operators. Two versions: the draft text (the NOPR, issued November 2019 in Docket RM18-9) and the final text (Order 2222, issued September 2020). We extract roughly 6 specific obligations from this one subsection — not the whole 660-page rule.
 
 ### The loop Rachel runs in Strata
 
@@ -79,8 +79,8 @@ That capability is not a search tool and not an alert feed. It is a workspace th
 
 Strata ships with two surfaces, one per role:
 
-- **CLI — the operator surface.** One command per pipeline stage (`main_ingest.py`, `main_detect_changes.py`, `main_eval.py`) plus one end-to-end command that chains them. Reviewers evaluating the submission run the CLI. Rachel does not — someone on Verdant's side (today Rachel's analyst, later a scheduled job) runs the pipeline to populate her review queue. [TDD §6.1 CLI](TDD.md#61-cli).
-- **Minimal web view — Rachel's surface.** A single page showing her prioritized review queue, with three affordances per item: the detected change with its source citation inline, the affected Verdant obligation / project / document highlighted, and three buttons (**approve** / **override** / **escalate**). A second page shows the per-project audit log so Rachel can confirm or roll back prior decisions. Deliberately minimal — enough that Rachel could use it without a walkthrough, nothing more. [TDD §6.2 Web View](TDD.md#62-web-view).
+- **CLI — the operator surface.** `main_detect_changes.py` runs the end-to-end pipeline (ingest + diff + verify + extract + map + enqueue); `main_eval.py` runs the eval harness; `main_review.py` launches the web view. Reviewers evaluating the submission run the CLI. Rachel does not — someone on Verdant's side (today Rachel's analyst, later a scheduled job) runs the pipeline to populate her review queue. [TDD §6.1 CLI](TDD.md#61-cli).
+- **Minimal web view — Rachel's surface.** A review-queue page with a card per detected change, each card carrying the source citation inline (with the citing span `<mark>`-highlighted) and a per-pair table of affected items (change × asset rows). Rachel multi-selects rows and decides each pair via four actions (**approve** / **override** / **dismiss** / **escalate**) + per-item action/route edit — bulk-decisions share a `batch_id` in the audit log. A second page shows the per-tenant+environment audit log so Rachel can confirm prior decisions (rollback is deferred — see [TDD §8.8](TDD.md#88-pure-fold-over-log-state--rollback)). Deliberately minimal — enough that Rachel could use it without a walkthrough, nothing more. [TDD §6.2 Web View](TDD.md#62-web-view).
 
 ---
 

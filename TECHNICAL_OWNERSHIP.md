@@ -263,18 +263,18 @@ seed + config + a replay of the pipeline — nothing non-reproducible.
 
 ### Where latency goes
 
-End-to-end run at v1 cardinality is **~20 LLM calls**:
+End-to-end run at v1 cardinality is **7 LLM calls**:
 - 1 version_diff
-- 3 citation_verify (one per Change)
+- 1 citation_verify (one batch call over all Changes)
 - 2 obligation_extraction (one per version)
 - 3 map_change (one per Change)
-- (plus ~11 unused slots for larger gold cases)
 
-Cold cache: **~30s wall-clock** dominated by OpenAI latency. The
+Cold cache: **~15s wall-clock** dominated by OpenAI latency. The
 mapping call is the single longest contributor — it carries the
 full company context (16 items at v1) and asks for a structured
-`MappingResponse` with per-item rationales. Second-longest:
-version_diff with both NOPR + Final text in the prompt.
+`MappingResponse` with per-item (match_confidence, match_rationale,
+proposed_action, proposed_route). Second-longest: version_diff with
+both NOPR + Final text in the prompt.
 
 Warm cache: **<1s**. diskcache `_cache.get(cache_key_json)` in
 [`model_caller.py:L116`](src/model_caller.py#L116) short-circuits
@@ -289,9 +289,9 @@ Pricing in
 [`openai_backend.py:L63-L68`](src/backends/openai_backend.py#L63-L68):
 `gpt-5.4-nano` at $0.00010 / 1k input tokens, $0.00040 / 1k output
 tokens. A typical cold-cache end-to-end run:
-- ~2000 input tokens × 20 calls = 40k input ≈ $0.004
-- ~500 output tokens × 20 calls = 10k output ≈ $0.004
-- **~$0.01 per cold-cache end-to-end run.**
+- ~2500 input tokens × 7 calls ≈ 17.5k input ≈ $0.002
+- ~700 output tokens × 7 calls ≈ 5k output ≈ $0.002
+- **~$0.005 per cold-cache end-to-end run.**
 
 Every call logs `openai_backend.call` with
 `{task_name, model_name, input_tokens, output_tokens,

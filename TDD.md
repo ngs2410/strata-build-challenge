@@ -1443,20 +1443,30 @@ _Source: FastAPI app in [`src/web_app.py`](https://github.com/ngs2410/strata-bui
 **v1.**
 - `src/web_app.py` FastAPI app:
   - `GET /queue?tenant_id=&environment=` → `templates/queue.html` —
-    prioritised `ReviewItem` list; each item shows the Change
-    description, source citation (link to the Passage text with the
-    citing span highlighted), affected items, recommended action,
-    confidence, and `[approve] [override] [escalate]` buttons.
+    prioritised `ReviewItem` list; each card carries the Change
+    description, source citation (passage text with the citing span
+    `<mark>`-highlighted inline), confidence, and a per-pair table of
+    affected (change × asset) rows with per-item proposed_action +
+    proposed_route, current `AssetDecision` state (if any), and a
+    bulk toolbar with four buttons `[approve] [override] [dismiss]
+    [escalate]`.
   - `GET /audit?tenant_id=&environment=` → `templates/audit.html` —
     read-only chronological `AuditEvent` list for the tenant /
-    environment. v1 is log-viewer only; the "rollback to this point"
-    affordance is deferred to future work along with the rollback
-    implementation itself (see §8.8).
-  - `POST /queue/<review_item_id>/action` — handle
-    approve/override/escalate; emits `AuditEvent`, updates
-    `ReviewItem.status`, redirects back to queue.
-- Jinja2 templates; no JS beyond a single form submit. All state
-  server-rendered.
+    environment, with `batch_id` surfaced per event so bulk per-pair
+    decisions share a visible group id. v1 is log-viewer only; the
+    "rollback to this point" affordance is deferred to future work
+    along with the rollback implementation itself (see §8.8).
+  - `POST /queue/{review_item_id}/decide` — handles single-row or
+    bulk-select per-pair decisions. Form fields: repeated
+    `affected_item_indexes`, one `decision` ∈ {approved, overridden,
+    dismissed, escalated}, one `action` ∈ {review, amend, no_op},
+    one `route` ∈ {market_ops, legal, it_metering}, one `rationale`.
+    Delegates to `apply_asset_decisions`; writes N `AssetDecision`s
+    + N `AuditEvent`s sharing a `batch_id` (None when N==1);
+    redirects back to queue.
+- Jinja2 templates; one tiny `<script>` block in `queue.html` wires
+  each card's "select all" checkbox to its row checkboxes (vanilla
+  JS, no framework). All other state server-rendered.
 - Auth: `tenant_id` in query parameter (no multi-user story in v1).
 
 **Production.**
@@ -1503,9 +1513,12 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
 ### Capacity envelope
 
 - **v1 full end-to-end run:** 2 versions × ~2000 tokens per subsection →
-  ~5 Changes → ~8 ExtractedObligations × 2 → ~5 Mappings against 16-item
-  company context → ~10 AuditEvents per review session. ~20 LLM calls
-  total; ~30s wall-clock cold cache, <1s warm.
+  3 Changes → 3 ExtractedObligations × 2 versions → 3 Mappings against
+  16-item company context → ~10 pipeline AuditEvents per end-to-end run
+  (per-pair asset_decision events come from Rachel's queue actions, not
+  the pipeline). 7 LLM calls total (1 version_diff + 1 citation_verify
+  + 2 obligation_extraction + 3 mapping); ~15s wall-clock cold cache,
+  <1s warm.
 - **Prod envelope target:** 100+ proceedings/year × 10+ versions × 50+
   sections each; 1000+ obligations per company; 10K+ audit events per
   project per quarter.

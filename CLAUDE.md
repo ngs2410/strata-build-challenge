@@ -21,17 +21,17 @@ src/                                Python library code
   model_caller.py                   ModelCaller — LLM dispatch, diskcache, retries
   prompt_registry.py                Task name → prompt builder function
   tenant_registry.py                Tenant list + DEFAULT_ENVIRONMENT constant
-  stores.py                         Store[T] ABC + JsonStore[T] concrete; typed instances for proceeding/obligation/project/document/audit
+  stores.py                         Store[T] ABC + JsonStore[T] + JsonlStore[T] concretes; typed singletons for proceeding/obligation/project/document/change/extracted_obligation/mapping/review_item/asset_decision/audit
   ingest.py                         Load proceeding versions + company context; passage model; normalize helpers
   version_diff.py                   Material-change detection + change summary (one LLM task; draft_vs_final is a Literal on the version model, not a classifier)
   citation/                         DEPTH AREA — kept as a sub-package
-    citation_grounding.py           Pin every claim to its source passage (structural passage_id + offsets)
+    citation_grounding.py           Pin every claim to its source passage (passage_id + offsets, back-mapped from a verbatim citing_span the LLM emits)
     citation_verify.py              Post-generation verifier — confirms the cited passage supports the claim
   obligation_extraction.py          Extract obligations from passages (LLM task)
-  mapping.py                        Change → affected obligations/projects/documents + recommended action + routing destination (one LLM task over the full company context)
-  review_queue.py                   Rachel's queue, escalation threshold, approve/override/escalate transitions
-  audit_log.py                      Append-only log + fold-to-current-state + rollback-to-timestamp
-  web_app.py                        FastAPI app — /queue and /audit routes with Jinja2 templates
+  mapping.py                        Change → affected items with per-item (proposed_action, proposed_route) proposals; one LLM task over the capped candidate set (per-item routing closed TDD §8.6 in v1)
+  review_queue.py                   Rachel's queue + per-pair apply_asset_decisions (approve/override/dismiss/escalate per change×asset pair, single-row or bulk); ReviewItem.status folds from AssetDecisions via _fold_status
+  audit_log.py                      Append-only JSONL log + log_event helper (fold-to-current-state + rollback-to-timestamp deferred per TDD §8.8)
+  web_app.py                        FastAPI app — /queue + /audit GETs, /queue/{id}/decide POST, with Jinja2 templates
   evals.py                          DEPTH AREA — eval harnesses for citation precision, mapping precision, change-detection quality
 config/
   default_domain_config.json        Baseline config (copied for new tenants)
@@ -39,14 +39,14 @@ data/
   tenants/verdant_grid/
     proceedings/                    Text excerpts of Order 2222 NOPR + Final Rule
     company_context.json            Seeded obligations, projects, documents for Verdant Grid
+    prod/                           Committed demo snapshot of pipeline outputs (see README "Demo snapshot")
   evals/
     gold.json                       Hand-labeled gold set for precision/recall metrics
 templates/
-  queue.html                        Rachel's review-queue page (Jinja2)
-  audit.html                        Per-project audit-log page (Jinja2)
+  queue.html                        Rachel's review-queue page (per-pair table + bulk toolbar; Jinja2)
+  audit.html                        Per-tenant+env audit-log page (Jinja2)
 scripts/                            CLI entry points (all main_*.py, use absl flags)
-  main_ingest.py                    Ingest a proceeding version + the company-context seed
-  main_detect_changes.py            Run version diff + extraction + mapping for an ingested proceeding
+  main_detect_changes.py            Run end-to-end pipeline (ingest + diff + verify + extract + map + enqueue) for a tenant/env; --stub_all for air-gapped regen
   main_review.py                    Launch the FastAPI web view (uvicorn wrapper)
   main_eval.py                      Run evals end-to-end
 tests/                              Pytest tests — test file naming: test_version_diff.py (not test_diff_version_diff.py)
@@ -124,7 +124,7 @@ These are non-negotiable properties of the Strata data model, not features that 
 - systems degrade gracefully and fail closed — partial results are better than nothing, but low-confidence results escalate rather than silently ship
 - no irreversible vendor dependencies
 - replayability is mandatory — tooling to replay logged API calls
-- overload handling (rate limits, queues, circuit breakers, deterministic load shedding) is a post-wedge concern — v1 scale (one tenant, ~20 LLM calls per end-to-end run) doesn't warrant it. Add it when real traffic materializes.
+- overload handling (rate limits, queues, circuit breakers, deterministic load shedding) is a post-wedge concern — v1 scale (one tenant, ~7 LLM calls per end-to-end run) doesn't warrant it. Add it when real traffic materializes.
 - scripts should always have a `--profile` flag that will use cProfile and log the top 50 most time consuming functions
 - scripts should have a `--dry_run` flag that shows what they would do rather than actually doing it
 - scripts should have a `--k` flag that allows the script to run over a small number of examples as a smoke test
@@ -166,7 +166,7 @@ Universal rules that catch recurring mistakes at plan-authoring time. Each rule 
   - **Why:** re-reading state introduces two sources of truth that drift. Reaching around a facade also breaks the backend contract — the facade exists so callers stay backend-agnostic when a second concrete lands.
   - **How to check:** grep the plan for `orjson.loads(`, `json.loads(`, `open(`, `Path(...).read_bytes()`, `Path(...).read_text()`, `DomainConfig(**`, `TaskModelConfig(**`, direct file-path constructions matching config / state artifacts. For each hit, ask 'is there a module whose job this already is?' If yes, route through that module. Also grep the plan for accesses to private attributes (`._foo`) from OUTSIDE the owning module.
 
-- **Rule — Sequential LLM dispatch at v1 scale (<20 items per stage) is the shipped shape; concurrent fan-out is deferred.** v1 cardinality is ~20 total LLM calls per end-to-end run — gpt-5.4-nano latency × 20 is well under a minute and diskcache makes warm runs <1s. Every call site uses `for item in items: model_caller.call(...)`, which is still cached, structured, and retried.
+- **Rule — Sequential LLM dispatch at v1 scale (<20 items per stage) is the shipped shape; concurrent fan-out is deferred.** v1 cardinality is 7 total LLM calls per end-to-end run (1 version_diff + 1 citation_verify + 2 obligation_extraction + 3 mapping) — gpt-5.4-nano latency × 7 is well under a minute and diskcache makes warm runs <1s. Every call site uses `for item in items: model_caller.call(...)`, which is still cached, structured, and retried.
   - **Why:** at Strata v1 scale, cache hits and retries matter; concurrency doesn't move the needle. The ModelCaller surface deliberately does NOT expose a `fan_out_for_task` helper in v1 — the module stays small. When a stage's cardinality crosses ~100 items (TDD §3.2's hierarchical diff, §3.5's two-stage extraction) we'll add a dedicated fan-out helper on `ModelCaller` and refactor that one caller; adding it speculatively is YAGNI.
   - **How to check:** grep the plan for `for X in Y:` blocks that call `model_caller.call(` inside the loop body. Sequential is correct at v1 cardinality. Any plan proposing `fan_out_for_task` or `n_jobs` or `ThreadPoolExecutor` wrapping `model_caller.call` must either (a) demonstrate the stage crosses the ~100-item bar at v1, or (b) be rejected as scope creep.
 

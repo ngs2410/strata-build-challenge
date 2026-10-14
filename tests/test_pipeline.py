@@ -704,6 +704,26 @@ def test_mapping_rubrics_contains_only_confidence_action_and_routing():
   assert 'prevents id hallucination' in field_intents_section
 
 
+def test_mapping_prompt_pitfalls_reject_hedge_verbs_in_match_rationale():
+  # Observed failure mode at gpt-5.4-nano on §(A) tightened change: the
+  # model emitted TWO borderline items at match_confidence=3 whose
+  # match_rationales led with hedge verbs ("may require updating...",
+  # "should reflect the updated..."). The emission-floor-at-3 rubric
+  # permitted them literally, but the Pitfall was designed to reject
+  # hedge-shaped rationales regardless of the number attached. The
+  # explicit hedge-verb language closes that loophole.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'HEDGE VERBS' in pitfalls_section
+  # Specific hedge verbs that showed up in the observed failure.
+  assert 'may require' in pitfalls_section
+  assert 'should reflect' in pitfalls_section
+
+
 def test_mapping_prompt_uses_mapping_confidence_rubric_not_generic():
   # The generic CONFIDENCE_LEVEL_RUBRIC describes citation-support
   # confidence; mapping needs semantic-overlap confidence with an

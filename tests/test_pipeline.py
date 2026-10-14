@@ -568,6 +568,29 @@ def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side()
   )
 
 
+def test_obligation_extraction_prompt_names_regulator_side_filter():
+  # The perspective rule is baked into OBLIGATION_TAXONOMY_REFERENCE
+  # (via prompt_calibration) AND reinforced by a concrete Example 4 +
+  # the first Pitfall. Without this guard the extractor would treat
+  # "the RTO shall accept bids" as an obligation of the aggregator,
+  # polluting the aggregator's compliance set with regulator duties.
+  version = _version('draft', 'nopr')
+  prompt = build_obligation_extraction_prompt(version)
+  _, user = prompt.render()
+  # Perspective rule is present in Rubrics (via OBLIGATION_TAXONOMY_REFERENCE).
+  rubrics_section = user.split('## Rubrics')[1].split('## Pitfalls')[0]
+  assert 'REGULATED ENTITY' in rubrics_section
+  # Example 4 (FinCEN regulator-side filter) is in Details.
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  assert 'FinCEN' in details_section
+  assert 'REGULATOR-side' in details_section or 'regulator-side' in details_section.lower()
+  # Pitfalls lead with the regulator-side filter.
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'REGULATOR-side' in pitfalls_section or 'regulator-side' in pitfalls_section.lower()
+  assert 'The Commission shall' in pitfalls_section
+  assert 'The RTO' in pitfalls_section
+
+
 def test_obligation_extraction_prompt_has_steps_details_pitfalls_sections():
   # Parity with version_diff and citation_verify. Scaffolding gives the
   # LLM an explicit decision procedure, three worked examples from

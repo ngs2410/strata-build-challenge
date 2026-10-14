@@ -27,6 +27,15 @@ def test_obligation_taxonomy_reference_names_every_type_and_includes_examples():
     assert body['example'] in OBLIGATION_TAXONOMY_REFERENCE
 
 
+def test_obligation_taxonomy_reference_embeds_regulated_entity_perspective():
+  # The extractor must not treat regulator-side duties ("the Commission
+  # shall...", "the RTO shall...") as obligations of the regulated
+  # entity. The shared perspective constant is baked into the taxonomy
+  # so any prompt consuming it inherits the rule — no separate opt-in
+  # required (same pattern as CHANGE_TYPE_RUBRIC).
+  assert REGULATED_ENTITY_PERSPECTIVE in OBLIGATION_TAXONOMY_REFERENCE
+
+
 def test_change_type_rubric_names_every_change_type():
   for name in CHANGE_TYPES:
     assert name in CHANGE_TYPE_RUBRIC

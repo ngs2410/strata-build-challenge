@@ -14,6 +14,12 @@ reporting / operational / procedural / financial. The taxonomy strings
 and the `Literal` set on `Obligation` and `ExtractedObligation` in
 config.py MUST stay in sync — grep both files when adding a type.
 
+Perspective: `OBLIGATION_TAXONOMY_REFERENCE` embeds
+`REGULATED_ENTITY_PERSPECTIVE` so the extractor never treats a
+regulator-side duty ("the Commission shall...", "the RTO shall...") as
+a regulated-entity obligation. Example 4 in the prompt's Details
+section + the first Pitfall make this concrete.
+
 The LLM returns `citing_span` as VERBATIM substring, never numeric offsets
 — the project's citation-grounding depth-area pattern. The system prompt
 and rubric both say "do not count characters or emit numeric offsets".
@@ -157,7 +163,20 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       '  NOT: the entire sentence including the "which shall be '
       'executed by ..." modifier. If the executive-signature clause '
       'were a distinct duty, it would be a separate obligation with '
-      'its own span.'
+      'its own span.\n'
+      '\n'
+      'Example 4 — regulator-side-duty filter (perspective rule):\n'
+      '  Passage (hypothetical FinCEN rule): "FinCEN shall make the '
+      'aggregated suspicious activity data available to law enforcement '
+      'agencies within 72 hours of filing. A bank shall file a '
+      'suspicious activity report with FinCEN when a transaction over '
+      '$5,000 meets the identified reporting criteria."\n'
+      '  Correct: ONE obligation — the bank\'s SAR-filing duty '
+      '(reporting). FinCEN\'s data-sharing duty is a REGULATOR-side '
+      'obligation and does NOT belong in the regulated entity\'s '
+      'compliance set. The perspective rule in the Rubrics preamble '
+      'applies to extraction as well as classification: Strata tracks '
+      'the regulated entity\'s duties, not the regulator\'s.'
     ),
     rubrics=(
       OBLIGATION_TAXONOMY_REFERENCE
@@ -177,6 +196,14 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       'after this call. See Example 3.'
     ),
     pitfalls=(
+      '- Do NOT extract a REGULATOR-side duty as an obligation of the '
+      'regulated entity. "The Commission shall...", "FinCEN shall...", '
+      '"The RTO/ISO shall accept bids from aggregators..." — these '
+      'establish duties FOR THE REGULATOR, not for the regulated '
+      'entity. Strata tracks the regulated entity\'s compliance set; '
+      'regulator-side duties are entity RIGHTS, not entity obligations, '
+      'and must be omitted. See Example 4 and the perspective rule in '
+      'the Rubrics preamble.\n'
       '- Do NOT split one duty with multiple sub-elements into multiple '
       'obligations. "shall limit uses and disclosures of PHI to the '
       'minimum necessary" is ONE duty (apply the minimum-necessary '

@@ -7,17 +7,20 @@ and so every classifier that could pick "tightened" vs "loosened" uses
 the same perspective rule):
 
   * `REGULATED_ENTITY_PERSPECTIVE` — the project's convention that any
-    "burden heavier / lighter" judgment is reasoned from the regulated
-    entity's compliance surface (aggregator / utility / hospital), NOT
-    from the regulator's authority. Any prompt that uses "tightened" or
-    "loosened" (currently just `version_diff`) or that reacts to those
-    classifications (currently `mapping`) must include this note so the
-    whole pipeline agrees on perspective. Baked into `CHANGE_TYPE_RUBRIC`
-    automatically; also importable standalone for prompts that need the
-    perspective note without the full rubric.
+    "burden heavier / lighter" judgment, AND the question of whose
+    duties are tracked at all, is reasoned from the regulated entity's
+    compliance surface (aggregator / utility / hospital), NOT from the
+    regulator's authority. Any prompt that classifies "tightened" vs
+    "loosened" or that enumerates obligations must include this note
+    so the whole pipeline agrees on perspective. Baked into both
+    `CHANGE_TYPE_RUBRIC` and `OBLIGATION_TAXONOMY_REFERENCE`
+    automatically; also importable standalone.
   * `OBLIGATION_TAXONOMY_REFERENCE` — the four `Obligation.obligation_type`
     `Literal` values (reporting / operational / procedural / financial)
-    expanded into definitions + examples. Keeps the LLM aligned with the
+    expanded into definitions + examples, prefaced by
+    `REGULATED_ENTITY_PERSPECTIVE` so the extractor never treats a
+    regulator-side duty ("the Commission shall...", "the RTO shall...")
+    as a regulated-entity obligation. Keeps the LLM aligned with the
     `Literal` set on `Obligation` and `ExtractedObligation` in config.py.
   * `CHANGE_TYPE_RUBRIC` — the five `Change.change_type` values
     (added / removed / tightened / loosened / cosmetic) with definitions,
@@ -158,6 +161,8 @@ def _build_obligation_taxonomy() -> str:
     'Obligation taxonomy. Every ExtractedObligation.obligation_type must be '
     'one of the four values below. The description + example calibrate '
     'what each value covers.',
+    '',
+    REGULATED_ENTITY_PERSPECTIVE,
     '',
   ]
   for name, body in OBLIGATION_TYPES.items():

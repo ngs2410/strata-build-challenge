@@ -687,6 +687,23 @@ def test_extract_obligations_produces_one_entry_per_version():
   assert grounded[0].citation.end_offset == len(llm_extracted[0].citation.citing_span)
 
 
+def test_mapping_rubrics_contains_only_confidence_action_and_routing():
+  # Rubrics is just MAPPING_CONFIDENCE_RUBRIC + RECOMMENDED_ACTION_RUBRIC +
+  # ROUTING_DESTINATION_GLOSSARY. The old "Additional rules" subsection was
+  # duplicated across Field Intents, so it was removed. The one
+  # load-bearing rule (index-based selection prevents id hallucination)
+  # is preserved in Field Intents under affected_items[*].item_index.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  rubrics_section = user.split('## Rubrics')[1].split('## Pitfalls')[0]
+  assert 'Additional rules' not in rubrics_section
+  field_intents_section = user.split('## Field Intents')[1].split('## JSON Output Example')[0]
+  assert 'prevents id hallucination' in field_intents_section
+
+
 def test_mapping_prompt_uses_mapping_confidence_rubric_not_generic():
   # The generic CONFIDENCE_LEVEL_RUBRIC describes citation-support
   # confidence; mapping needs semantic-overlap confidence with an

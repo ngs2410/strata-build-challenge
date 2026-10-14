@@ -232,7 +232,9 @@ def build_mapping_prompt(
       'candidate list in the Inputs section (obligation_candidates, '
       'project_candidates, or document_candidates per item_type). Count '
       'the "[0]" / "[1]" / ... prefixes. Must be a valid index into that '
-      'list.\n'
+      'list. Do NOT copy the item id string into this field — index-based '
+      'selection prevents id hallucination (the harness resolves the '
+      'index to the real id after).\n'
       '- affected_items[*].match_confidence: integer 0-5 per the confidence '
       'rubric below.\n'
       '- affected_items[*].match_rationale: one sentence naming the specific '
@@ -254,18 +256,6 @@ def build_mapping_prompt(
       + RECOMMENDED_ACTION_RUBRIC
       + '\n\n'
       + ROUTING_DESTINATION_GLOSSARY
-      + '\n\n'
-      'Additional rules:\n'
-      '- Emit affected_items by 0-based index into the matching candidate '
-      'list, NOT by copying the item id string. Index-based selection '
-      'prevents id hallucination.\n'
-      '- recommended_action is one of review / amend / no_op per the '
-      'rubric above.\n'
-      '- routing_destination is one of market_ops / legal / it_metering '
-      'per the glossary above. Pick the single PRIMARY team accountable '
-      'for the change.\n'
-      '- Report confidence as an integer 0-5 per the confidence rubric '
-      'above; set confidence_rationale naming the rubric level and why.'
     ),
     pitfalls=(
       '- Do NOT map an item just because its name is topically adjacent '

@@ -299,6 +299,26 @@ estimated_cost_usd}` — grep structlog JSON output to compute
 exact spend per run. Cost is explicit per CLAUDE.md's "unit
 economics" principle.
 
+**Where cost would blow up at production scale.** v1's $0.01-per-run
+math is a tiny-corpus number: one tenant, one subsection, 16-item
+company context. A production deployment hits a different regime:
+600-page regulator orders, 100+ proceedings per year per regulator,
+10+ customers of the same regulator across multiple industries,
+1000+ obligations per company. The aggregate mapping surface
+becomes `N_tenants × M_changes × L_items` — plausibly O(100K)
+candidate mappings per rule issuance across the customer base.
+At gpt-5.4-nano pricing that's ~$100 per rule, not catastrophic in
+isolation but non-linear in regulator count and tenant count, and
+latency-bound regardless. [TDD §8.9](TDD.md#89-cross-tenant-amortisation--multi-tier-mapping-cull)
+writes up the amortisation path (cross-tenant change-detection
+store, keyed on `(regulator, proceeding, version_pair)`, so N
+tenants share one detection pass; small supervised classifier for
+first cull; Jev Noul for second cull; LLM only on the probable
+matches). The architecture is designed for this expansion — the
+`.model_cache` key already deduplicates across tenants with
+identical prompts — but the cross-tenant store, classifier
+training loop, and Jev tier are production work, not v1 scope.
+
 ---
 
 ## Q5. The AI part at mechanism level — four tasks, what each receives, what it emits, one thing it gets wrong

@@ -1512,6 +1512,13 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
 - **First scaling pressure:** the mapping call's context overflow when
   company context exceeds ~200 items. All three Mapping scaling paths
   (§3.6) are designed for this.
+- **Second scaling pressure — cross-tenant combinatorics.** The §3.6
+  paths handle one tenant at a time; a production deployment with N
+  customers sharing a regulator or K regulators per customer runs
+  into an aggregate N × M mapping matrix that LLM-per-pair cannot
+  afford. The amortisation path (cross-tenant change-detection store
+  + learned BERT-tier pre-filter + Jev middle cull + LLM on
+  survivors) is written up as [§8.9](#89-cross-tenant-amortisation--multi-tier-mapping-cull).
 
 ---
 
@@ -1687,6 +1694,80 @@ in production.
 mis-approval, (b) the audit log and status column drift in practice,
 or (c) we choose audit-and-rollback as a depth area in a future
 revision.
+
+### 8.9 Cross-tenant amortisation + multi-tier mapping cull
+
+**State.** The current pipeline is calibrated for the v1 wedge: one
+tenant, one proceeding, one subsection, ~16-item company context.
+Every change is detected per-tenant from scratch; every candidate
+mapping goes through a full LLM call. The §3.6 scaling paths
+(candidate pre-filter, Jev decomposition, fine-tuned classifier)
+handle growing *per-tenant* corpus size, but do not address the
+cross-tenant and multi-regulator combinatorics that production
+hits almost immediately. The §7 scaling-pathway table identifies
+the per-stage first bottleneck but not the aggregate blow-up when
+N tenants × M regulator documents × K changes × L company-context
+items all compose.
+
+**Open — the production N × M matrix.** At realistic scale (a
+600-page order, 100+ proceedings per year per regulator, 10+
+customers of the same regulator across multiple regulated
+industries), the aggregate mapping surface is `N_customers ×
+M_changes × L_items`. LLM-per-pair is impractical: a single
+regulator issuing a quarterly rule produces O(1000) change-item
+pairs per customer; across 100 customers that's O(100K)
+candidate mappings per rule issuance. GPT-tier latency and cost
+make this a non-starter at the frontier model and marginal even
+at nano.
+
+**Next moves — three composable amortisations:**
+
+1. **Cross-tenant change-detection cache.** `version_diff` output
+   is a property of the *regulator's* two document versions, not
+   of any one tenant. The `.model_cache` key already includes the
+   full prompt input, so two customers of the same RTO/ISO should
+   deterministically hit the same cached detection. Promote this
+   from an incidental diskcache artifact to an explicit
+   cross-tenant **change store** keyed by `(regulator,
+   proceeding_id, prior_version_id, new_version_id)` — one
+   detection pass per regulator per rule issuance, N tenants read
+   the same results. This leaves obligation extraction (also
+   tenant-independent per version) in the same bucket. Only
+   mapping and review are per-tenant.
+
+2. **Learned pre-filter (BERT-tier classifier).** Before any LLM
+   mapping call, run a small supervised classifier that scores
+   `P(this change substantively affects this candidate item | change
+   text + item summary)`. A MiniLM-sized model fine-tuned on
+   accumulated Rachel-labelled accept/dismiss outcomes (open
+   question 8.4) culls obviously-irrelevant mappings — plausibly
+   10-100× reduction in LLM-mapping surface at the floor. The
+   classifier runs on CPU, latency measured in milliseconds per
+   candidate.
+
+3. **Jev as the medium-cull middle tier.** For survivors of the
+   BERT cull, run Jev Noul `"does this change substantively affect
+   this item?"` in parallel across the remaining candidates (Jev's
+   many-questions-per-state architecture is designed for exactly
+   this shape — see JEV.md §5). Jev's calibrated probabilities
+   provide a second filter at a cost / latency profile between the
+   classifier and the LLM.
+
+4. **LLM only on the probable matches.** The N × M matrix shrinks
+   to the top-k survivors of the two culls — plausibly single-digit
+   candidates per change at steady state. This is where the LLM's
+   per-item rationale generation adds the most value: on items
+   where the yes/no is already settled, writing the semantic
+   mapping and recommending (action, route).
+
+**Trigger.** Either (a) first prospective tenant whose company
+context exceeds ~200 items (first per-tenant pressure, mitigated by
+§3.6 (a) alone), (b) second prospective tenant sharing a regulator
+with an existing tenant (triggers the cross-tenant change store
+immediately), or (c) a prospective regulator-adjacent product
+decision (e.g., "serve all MISO aggregators as one deployment")
+that pushes the amortisation value past the wedge-stage
+engineering investment.
 
 ---
 

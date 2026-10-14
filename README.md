@@ -339,6 +339,28 @@ file + line range for its topic — see [TDD.md](TDD.md).
   [PRD §7](PRD.md#7-open-questions-and-unvalidated-assumptions) and
   [TDD §8.6](TDD.md#86-multi-reviewer-routing) cover the v2 shift to
   primary + CC routing.
+- **LLM-per-pair mapping does not scale beyond the v1 wedge.** The
+  current architecture runs an LLM call per candidate (change, item)
+  pair. At the demo scale (one tenant, one subsection, 16-item
+  context) this is ~20 LLM calls per run and costs cents. A
+  production deployment hits a different regime: 600-page
+  regulator orders, 100+ proceedings per year per regulator, 10+
+  customers of the same regulator across multiple industries, 1000+
+  obligations per company. The aggregate mapping surface becomes
+  `N_tenants × M_changes × L_items` — plausibly O(100K) candidate
+  mappings per rule issuance across the customer base.
+  [TDD §8.9](TDD.md#89-cross-tenant-amortisation--multi-tier-mapping-cull)
+  writes up the amortisation path: (1) a cross-tenant
+  change-detection store keyed on `(regulator, proceeding,
+  version_pair)` so N customers of the same regulator share one
+  detection pass, (2) a learned BERT-tier classifier for an initial
+  cull of obviously-irrelevant mappings, (3) Jev Noul as a medium
+  cull on the survivors, (4) LLM only on the probable matches to
+  write the semantic mapping + action/route recommendation. This is
+  production work, not v1 scope — the pipeline shape reserves the
+  seams (`.model_cache` key already deduplicates on prompt input;
+  the `Backend.matches` facade will accept a `bert://` or `jev://`
+  prefix without a refactor).
 - **No rollback** — `/audit` is read-only;
   [TDD §8.8](TDD.md#88-pure-fold-over-log-state--rollback) covers the
   deferred fold-over-log + replay-to-timestamp design.

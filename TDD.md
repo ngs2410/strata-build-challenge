@@ -1100,7 +1100,8 @@ inline on the choices where the panel is likely to ask.
   `src/telemetry.py::configure_logging` (one of the first things
   scripts call via `main_detect_changes.py`).
 
-- **CLI flags — absl-py flags.** Centralised flag registration;
+- **CLI flags — absl-py flags.** It's what Google uses — carried
+  over as a familiar convention. Centralised flag registration;
   cross-script flag reuse (shared defaults for `--tenant_id`,
   `--environment`); strict type coercion. Click / typer were
   considered; absl's `FLAGS` namespace is more honest about the
@@ -1756,7 +1757,8 @@ exposes `--host`, `--port`, `--reload`.
 - Scripts emit OTel spans; failures page oncall.
 
 **Decisions.**
-- **absl flags over argparse.** Centralised flag registration;
+- **absl flags over argparse.** It's what Google uses — carried over
+  as a familiar convention. Centralised flag registration;
   cross-script flag reuse; standard flag types.
 - **Combined ingest + pipeline in v1; split in a future commit.** The
   original plan was a separate `scripts/main_ingest.py` that persists
@@ -1832,7 +1834,7 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
 | Citation grounding    | LLM-emits-index + substring | Full passage index + Jev Noul re-anchor             | Draft→final with restructuring       |
 | Citation verify       | LLM-as-NLI                  | **Jev Noul** — direct replacement                   | Every claim; cost dominates at scale |
 | Obligation extraction | 1 LLM call per subsection   | Jev Noul pre-filter + LLM extract + Jev Noul verify | Full documents (660pp × 100/yr)      |
-| Mapping               | 1 LLM call, full context    | Three paths — see §3.6                              | Company context > ~200 items         |
+| Mapping               | 1 LLM call, full context    | Three paths — see [§3.6](#36-mapping)               | Company context > ~200 items         |
 | Review queue          | JSONL fold in memory        | Postgres materialised view                          | ~100K audit events per tenant        |
 | Audit log             | JSONL append                | Postgres append + partitioning                      | Same as review queue                 |
 | Config                | JSON + Pydantic             | Postgres config + admin CLI                         | Needing runtime config changes       |
@@ -1849,8 +1851,8 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
   3 Changes → 3 ExtractedObligations × 2 versions → 3 Mappings against
   16-item company context → ~10 pipeline AuditEvents per end-to-end run
   (per-pair asset_decision events come from Rachel's queue actions, not
-  the pipeline). 7 LLM calls total (1 version_diff + 1 citation_verify
-  + 2 obligation_extraction + 3 mapping); ~15s wall-clock cold cache,
+  the pipeline). 7 LLM calls total (1 version_diff + 1 citation_verify +
+  2 obligation_extraction + 3 mapping); ~15s wall-clock cold cache,
   <1s warm.
 - **Prod envelope target:** 100+ proceedings/year × 10+ versions × 50+
   sections each; 1000+ obligations per company; 10K+ audit events per
@@ -1862,9 +1864,9 @@ Summary: for each component, v1 shape → prod shape + first bottleneck.
   paths handle one tenant at a time; a production deployment with N
   customers sharing a regulator or K regulators per customer runs
   into an aggregate N × M mapping matrix that LLM-per-pair cannot
-  afford. The amortisation path (cross-tenant change-detection store
-  + learned BERT-tier pre-filter + Jev middle cull + LLM on
-  survivors) is written up as [§8.9](#89-cross-tenant-amortisation--multi-tier-mapping-cull).
+  afford. The amortisation path (cross-tenant change-detection store +
+  learned BERT-tier pre-filter + Jev middle cull + LLM on survivors)
+  is written up as [§8.9](#89-cross-tenant-amortisation--multi-tier-mapping-cull).
 
 ---
 
@@ -1896,8 +1898,8 @@ it.
    probabilities are the strongest calibration story in-market (JEV.md
    §6).
 4. Fine-tuned classifier on accumulated gold once >200 labelled items
-   exist. Produces per-task calibrated probabilities from a small
-   supervised model.
+   exist. Can be trained to produce per-task calibrated probabilities
+   from a small supervised model.
 
 **Trigger.** Reliability diagram's high-confidence bucket drops below
 95% precision.

@@ -208,6 +208,13 @@ class ProceedingVersion(BaseModel):
 _Source: [`src/config.py` L51-L61](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L51-L61)._
 
 **Decisions.**
+- **`tenant_id` + `environment` are storage keys, not semantic
+  ownership.** A regulator's proceeding version is tenant-independent
+  — N customers of the same regulator would see the same NOPR + Final
+  Rule text. v1 keys every persisted entity per `(tenant_id,
+  environment)` because `Store[T]` is uniform (CLAUDE.md tenant-isolation
+  rule), not because the version belongs to a tenant. The cross-tenant
+  proceeding/change store is §8.9 (first next-move).
 - **`status` is a required `Literal`, not a classifier task.** The user
   asserts draft/final at ingest time — it's a metadata property of the
   document, not a judgment call. Making this a classifier would be a bug:
@@ -272,6 +279,11 @@ class Citation(BaseModel):
 _Source: `Change` [`src/config.py` L73-L85](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L73-L85), `Citation` [`src/config.py` L64-L70](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L64-L70)._
 
 **Decisions.**
+- **`tenant_id` + `environment` are storage keys, not semantic
+  ownership.** Same reasoning as `ProceedingVersion` (§2.1): a `Change`
+  is a property of the regulator's two versions, independent of any one
+  tenant. Keyed per `(tenant_id, environment)` in v1 for storage
+  uniformity; the cross-tenant change store is §8.9 (first next-move).
 - **`change_type` is a closed Literal of five values.** Flagged in
   open-question #5 — expect iteration with Rachel's feedback.
 - **`confidence` is an integer 0–5, not a float.** Self-reported float

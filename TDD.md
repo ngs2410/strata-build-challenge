@@ -4,17 +4,18 @@
 
 Technical design for Strata v1 — a regulatory change-to-action workspace
 for in-house regulatory affairs teams. Scope, user, and non-goals are
-established in **PRD.md**; this document covers the architecture and the
-reasoning behind each piece.
+established in [PRD.md](PRD.md); this document covers the architecture
+and the reasoning behind each piece.
 
 Governing documents for code written against this design:
-- **PRD.md** — scope, user, non-goals, success metrics
-- **CLAUDE.md** — code style, mandatory design-compliance rules, tooling,
-  engineering principles
-- **PROMPT_CONVENTIONS.md** — authoring conventions for LLM tasks
-- **TEST_QUALITY.md** — test-quality rules
-- **JEV.md** — reference for the Jev discrimination model (used across
-  the design)
+- [**PRD.md**](PRD.md) — scope, user, non-goals, success metrics
+- [**CLAUDE.md**](CLAUDE.md) — code style, mandatory design-compliance
+  rules, tooling, engineering principles
+- [**PROMPT_CONVENTIONS.md**](PROMPT_CONVENTIONS.md) — authoring
+  conventions for LLM tasks
+- [**TEST_QUALITY.md**](TEST_QUALITY.md) — test-quality rules
+- [**JEV.md**](JEV.md) — reference for the Jev discrimination model
+  (used across the design)
 
 **Cross-references to source.** Each design section carries an italic
 `_Source: ..._` line linking to the exact module (and, where
@@ -32,7 +33,7 @@ a specific scaling path, not a complete production design.
 Strata uses a deliberate **two-model AI architecture**:
 - **OpenAI frontier model** for *generation* — open-ended extraction,
   free-text rationale, candidate production.
-- **Jev** (TypeSafe AI's System One decision model — see JEV.md) for
+- **Jev** (TypeSafe AI's System One decision model — see [JEV.md](JEV.md)) for
   *discrimination* — typed decisions over defined answer spaces with
   calibrated probabilities. v1 LLM-emulates the Jev-shaped calls through
   the same `ModelCaller` seam; migration to the real Jev client is a

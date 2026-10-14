@@ -45,8 +45,10 @@ string literals at call sites (CLAUDE.md "centralized lookup
 tables").
 '''
 
+import uuid
 from datetime import datetime, timezone
 
+from src.audit_log import log_event
 from src.config import (
   AssetDecision,
   Change,
@@ -55,6 +57,13 @@ from src.config import (
   ReviewItem,
 )
 from src.stores import asset_decision_store, mapping_store, review_item_store
+
+_DECISION_TO_EVENT_KIND: dict[str, str] = {
+  'approved': 'asset_decision_approved',
+  'overridden': 'asset_decision_overridden',
+  'dismissed': 'asset_decision_dismissed',
+  'escalated': 'asset_decision_escalated',
+}
 
 # Priority order used by _fold_status when a ReviewItem has at least one
 # decision per affected_item (otherwise 'pending' always wins). Higher
@@ -120,6 +129,7 @@ def apply_asset_decisions(
   review_item = _find_review_item(review_items, review_item_id)
   mapping = _find_mapping(tenant_id, environment, review_item.mapping_id)
   now = datetime.now(timezone.utc)
+  batch_id = f'batch-{uuid.uuid4().hex[:12]}' if len(inputs) > 1 else None
   new_decisions: list[AssetDecision] = []
   for raw in inputs:
     index = raw['affected_item_index']
@@ -154,8 +164,23 @@ def apply_asset_decisions(
     all_decisions = asset_decision_store.load_all(tenant_id, environment)
   except FileNotFoundError:
     all_decisions = []
+  prior_by_key = {(d.review_item_id, d.affected_item_index): d for d in all_decisions}
   updated_decisions = _merge_decisions(all_decisions, new_decisions)
   asset_decision_store.save_all(tenant_id, environment, updated_decisions)
+  for decision in new_decisions:
+    prior = prior_by_key.get((decision.review_item_id, decision.affected_item_index))
+    log_event(
+      tenant_id,
+      environment,
+      kind=_DECISION_TO_EVENT_KIND[decision.decision],
+      target_type='asset_decision',
+      target_id=decision.decision_id,
+      prior_value=prior,
+      new_value=decision,
+      rationale=decision.rationale,
+      actor=actor,
+      batch_id=batch_id,
+    )
   decisions_for_item = [d for d in updated_decisions if d.review_item_id == review_item_id]
   new_status = _fold_status(decisions_for_item, len(mapping.affected_items))
   pending_count = len(mapping.affected_items) - len(decisions_for_item)

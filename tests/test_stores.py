@@ -31,6 +31,7 @@ def _audit_event(event_id, day, environment='prod'):
     prior_value_json=None,
     new_value_json=None,
     rationale=None,
+    batch_id=None,
   )
 
 

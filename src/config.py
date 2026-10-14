@@ -220,13 +220,24 @@ class AuditEvent(BaseModel):
     'review_item_approved',
     'review_item_overridden',
     'review_item_escalated',
+    'asset_decision_approved',
+    'asset_decision_overridden',
+    'asset_decision_dismissed',
+    'asset_decision_escalated',
     'rollback_executed',
   ]
-  target_type: Literal['proceeding_version', 'change', 'mapping', 'review_item']
+  target_type: Literal[
+    'proceeding_version', 'change', 'mapping', 'review_item', 'asset_decision'
+  ]
   target_id: str
   prior_value_json: str | None
   new_value_json: str | None
   rationale: str | None
+  # Shared across the N events emitted by one bulk apply_asset_decisions
+  # call so audit.html can collapse the group into one entry (commit 6
+  # does the UI grouping). None for single-row decisions and for all
+  # non-review events.
+  batch_id: str | None
 
 
 class EscalationConfig(BaseModel):

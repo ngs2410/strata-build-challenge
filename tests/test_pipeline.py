@@ -1191,6 +1191,92 @@ def test_apply_asset_decisions_raises_on_out_of_range_index(verdant_grid_seeded)
     )
 
 
+def test_apply_asset_decisions_single_emits_one_audit_event_no_batch_id(
+  verdant_grid_seeded,
+):
+  from src.audit_log import audit_log_store
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=[
+      _asset_input(
+        0,
+        decision='approved',
+        action=mapping.affected_items[0].proposed_action,
+        route=mapping.affected_items[0].proposed_route,
+      )
+    ],
+    actor='rachel',
+  )
+  events = audit_log_store.load_all('verdant_grid', 'prod')
+  decision_events = [e for e in events if e.kind == 'asset_decision_approved']
+  assert len(decision_events) == 1
+  assert decision_events[0].target_type == 'asset_decision'
+  assert decision_events[0].batch_id is None  # single-row op → no batch
+
+
+def test_apply_asset_decisions_bulk_emits_n_audit_events_same_batch_id(verdant_grid_seeded):
+  from src.audit_log import audit_log_store
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  inputs = []
+  for i, a in enumerate(mapping.affected_items[:3]):
+    inputs.append(
+      _asset_input(i, decision='approved', action=a.proposed_action, route=a.proposed_route)
+    )
+  apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=inputs,
+    actor='rachel',
+  )
+  events = audit_log_store.load_all('verdant_grid', 'prod')
+  decision_events = [e for e in events if e.kind == 'asset_decision_approved']
+  assert len(decision_events) == len(inputs)
+  batch_ids = {e.batch_id for e in decision_events}
+  assert len(batch_ids) == 1
+  batch_id = next(iter(batch_ids))
+  assert batch_id is not None
+  assert batch_id.startswith('batch-')
+
+
+def test_log_event_counter_prevents_microsecond_collisions(isolated_tenants_dir):
+  del isolated_tenants_dir
+  from src.audit_log import log_event
+
+  event_ids = set()
+  for i in range(100):
+    event = log_event(
+      'test_tenant',
+      'test_env',
+      kind='asset_decision_approved',
+      target_type='asset_decision',
+      target_id=f'd-{i}',
+    )
+    event_ids.add(event.event_id)
+  assert len(event_ids) == 100  # all unique even in a tight loop
+
+
 def test_apply_asset_decisions_raises_on_empty_inputs(verdant_grid_seeded):
   from src.review_queue import apply_asset_decisions
 

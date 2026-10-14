@@ -32,6 +32,9 @@
           <div class="event-meta">
             <span class="meta-item"><span class="meta-label">actor</span> {{event.actor}}</span>
             <span class="meta-item"><span class="meta-label">target</span> {{event.target_type}}: <code>{{event.target_id}}</code></span>
+            {% if event.batch_id %}
+              <span class="meta-item"><span class="meta-label">batch</span> <code>{{event.batch_id}}</code></span>
+            {% endif %}
           </div>
           {% if event.rationale %}
             <p class="event-rationale">{{event.rationale}}</p>

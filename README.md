@@ -245,7 +245,7 @@ src/                          Library code
     llm_citation.py           LLM-side LlmCitation (passage_id + citing_span)
   obligation_extraction.py    LLM task: extract obligations
   mapping.py                  LLM task: map changes to internal state
-  review_queue.py             ReviewItem construction + apply_action
+  review_queue.py             ReviewItem + per-pair apply_asset_decisions
   audit_log.py                Append-only JSONL audit log
   web_app.py                  FastAPI app (/queue + /audit + /static mount)
   model_caller.py             ModelCaller facade (openai / jev / stub)

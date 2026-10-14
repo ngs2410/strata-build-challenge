@@ -185,10 +185,10 @@ Other small directed changes I could demonstrate:
   `'verify.skipped'`.
 - Add a new routing destination: three touches, all
   `grep`-connected. (a)
-  [`Mapping.routing_destination`](src/config.py#L159) adds the
+  [`AffectedItem.proposed_route`](src/config.py) adds the
   Literal value, (b) same for
-  [`ExpectedMapping.routing_destination`](src/evals.py#L80) in
-  the gold schema, (c) [`src/mapping.py`](src/mapping.py#L119)
+  [`ExpectedAffectedItem.expected_route`](src/evals.py) in
+  the gold schema, (c) [`src/mapping.py`](src/mapping.py)
   prompt rubric names it. The seed company_context would then get
   obligations/projects with `owner` on the new value.
 
@@ -427,12 +427,14 @@ economics" principle.
 - **Emits**: `MappingResponse` with
   `affected_items: tuple[AffectedItemByIndex, ...]`
   (each is `{item_type, item_index, match_confidence,
-  match_rationale}`),
-  `recommended_action: Literal['review'|'amend'|'no_op']`,
-  `routing_destination: Literal['market_ops'|'legal'|'it_metering']`,
+  match_rationale, proposed_action, proposed_route}`),
   `confidence + rationale`, overall `rationale`. **Returns
   indexes, not IDs** — PROMPT_CONVENTIONS.md §5 (LLMs can't echo
-  long opaque IDs reliably).
+  long opaque IDs reliably). **Per-item (action, route)** —
+  no mapping-level `recommended_action` / `routing_destination`
+  (TDD §8.6 closed in v1). One Change touching N diverse assets
+  produces N (action, route) proposals; Rachel's `AssetDecision`
+  curates each pair.
 - **Gets wrong (observed on gpt-5.4-nano, Order 2222 §A tightened
   change)**: two residual failure patterns after four rounds of
   prompt tightening. (1) **Topical-adjacency over-mapping with
@@ -631,10 +633,14 @@ shape:
   per-stage counts (2 versions, 8 obligations, 3 projects, 5
   documents, 3 changes, 2 extracted, 3 mappings, 3 review_items).
   A regression in any stage changes a count.
-- **Review-queue actions.** `apply_action` transition tests prove
-  approve → `approved`, override → `overridden`, escalate →
-  `escalated`, each with a matching `AuditEvent` kind, actor,
-  rationale, prior+new value JSON.
+- **Review-queue actions.** `apply_asset_decisions` tests prove
+  per-pair approve / override / dismiss / escalate transitions,
+  bulk writes with a shared `batch_id`, `ReviewItem.status` folds
+  from the AssetDecision set, and priority decays as decisions
+  land. Each decision emits a matching `AuditEvent`
+  (`asset_decision_approved` / `_overridden` / `_dismissed` /
+  `_escalated`) with actor, rationale, prior+new value JSON, and
+  the shared `batch_id` on bulk ops.
 - **Web app routes.** `test_web_app.py` proves `/` 307-redirects,
   `/queue` and `/audit` render with expected content (including
   the `<mark>`-highlighted citation spans), POST /action
@@ -687,9 +693,11 @@ pipeline against `data/evals/gold.json` and scores every stage:
 - **Obligation extraction**: `score_extractions` matches by
   `(version_id, obligation_type, passage_position)` and reports
   type-correctness.
-- **Mapping**: `score_mappings` scores per-item precision/recall
-  on affected obligation/project/document IDs AND
-  `recommended_action` / `routing_destination` accuracy.
+- **Mapping**: `score_mappings` joins predicted and expected
+  affected items on `(item_type, item_id)` and scores per-item
+  precision/recall, plus per-item `proposed_action` and
+  `proposed_route` accuracy (expected labels live on
+  `ExpectedAffectedItem` in `src/evals.py`).
 - **Confidence calibration**: `aggregate` produces a reliability
   diagram — predicted-confidence buckets vs. actual precision —
   which is the direct measurement of the PRD §4
@@ -732,6 +740,6 @@ trust-metric evidence.
 | Grounding math + failure modes correct                   | `test_ground_citations_*`                 | How often LLM produces an unfindable `citing_span`     |
 | Escalation gate semantics correct                        | `test_enqueue_mapping_*`                  | Threshold defaults are empirically optimal             |
 | ModelCaller caches / retries / fails loudly              | `test_model_caller.py`, `test_openai_backend.py` | Real OpenAI 429 / 5xx distributions             |
-| Review queue state transitions correct                   | `test_apply_action_*`                     | Rachel's actual decision-making                        |
+| Review queue state transitions correct (per-pair)        | `test_apply_asset_decisions_*`            | Rachel's actual decision-making                        |
 | Trust metrics (citation precision ≥ 98%, mapping ≥ 90%)  | Eval harness over gold set (when run with a real API key) | Generalisation beyond this one subsection    |
 | Confidence calibration                                   | Reliability diagram (visual)              | Prod-quality calibration (needs Jev or fine-tuning)    |

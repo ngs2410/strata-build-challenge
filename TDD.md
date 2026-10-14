@@ -299,8 +299,6 @@ class Mapping(BaseModel):
     environment: str
     change_id: str                          # the Change this mapping is for
     affected_items: tuple[AffectedItem, ...]
-    recommended_action: Literal['review', 'amend', 'no_op']
-    routing_destination: Literal['market_ops', 'legal', 'it_metering']
     confidence: int                         # 0-5 overall mapping confidence
     confidence_rationale: str
     rationale: str                          # free-text explanation
@@ -312,29 +310,28 @@ class AffectedItem(BaseModel):
     item_id: str
     match_confidence: int                   # 0-5 per-item
     match_rationale: str
+    proposed_action: Literal['review', 'amend', 'no_op']
+    proposed_route: Literal['market_ops', 'legal', 'it_metering']
 ```
 
-_Source: persisted `Mapping` [`src/config.py` L149-L162](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L149-L162), persisted `AffectedItem` [`src/config.py` L141-L146](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L141-L146). LLM-side intermediate `AffectedItemByIndex` + `MappingResponse` live in [`src/mapping.py` L79-L94](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py#L79-L94) — see §3.6 for the index→id translation._
+_Source: persisted `Mapping` [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py), persisted `AffectedItem` [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py). LLM-side intermediate `AffectedItemByIndex` + `MappingResponse` live in [`src/mapping.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/mapping.py) — see §3.6 for the index→id translation._
 
 **Decisions.**
-- **One `Mapping` per `Change`, with a tuple of `AffectedItem`
-  children.** A change maps to a *set* of affected items (potentially
-  from all three types) but gets *one* overall recommended action and
-  *one* routing destination. Per-item `match_confidence` is distinct
-  from the overall `confidence`.
-- **`routing_destination` as `Literal`, not free text.** v1 ships three
+- **Per-item (action, route) replace mapping-level summary.** Each
+  `AffectedItem` carries `proposed_action` and `proposed_route`. One
+  Change touching N diverse assets produces N (action, route) pairs
+  — different items in the same Mapping can route to different teams
+  (TDD §8.6 closed in v1).
+- **`proposed_route` as `Literal`, not free text.** v1 ships three
   destinations; prod makes this configurable per-tenant.
-- **Single `routing_destination` per Change — a v1 scope choice, not a
-  modeling claim.** Real regulatory changes often touch multiple teams
-  in parallel. v1 captures only the primary team; the expansion to
-  `routing_destinations: tuple[Literal[...], ...]` (primary + CC, or
-  parallel) is tracked as open question [§8.6](#86-multi-reviewer-routing)
-  along with the workflow-engine questions it opens, and matches
-  [PRD §7 bullet 6](PRD.md#7-open-questions-and-unvalidated-assumptions).
-- **`recommended_action` is a `Literal` of three values.** Alternatives:
+- **`proposed_action` is a `Literal` of three values.** Alternatives:
   open-ended free text (unverifiable; forces Rachel to interpret every
   action), per-action-type structured outputs (over-engineered). Three
-  categorical values is the right granularity for the review UI.
+  categorical values is the right granularity for the per-pair
+  review UI.
+- **Per-pair curation lives in `AssetDecision` (§2.6).** The Mapping
+  is the AI's proposal set; the AssetDecision records Rachel's
+  per-pair decision + chosen (action, route).
 
 ### 2.6 ReviewItem
 
@@ -350,11 +347,44 @@ class ReviewItem(BaseModel):
     created_at: datetime
 ```
 
-A `ReviewItem` is a reader's lens over a `Mapping` — see §3.7. `status`
-is the current fold over `AuditEvent`s, not a mutable column (per
-CLAUDE.md invariant).
+A `ReviewItem` is the queue-level wrapper for one `Mapping`. `status`
+is a write-time aggregate (`_fold_status` in
+[`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py))
+over the per-pair `AssetDecision` set — pending > escalated >
+overridden > approved. Pure fold-over-the-audit-log is tracked as the
+TDD §8.8 open question.
 
-_Source: [`src/config.py` L165-L173](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L165-L173)._
+_Source: [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py)._
+
+### 2.6b AssetDecision
+
+```python
+class AssetDecision(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    decision_id: str                        # f'{review_item_id}:item-{index:03d}'
+    tenant_id: str
+    environment: str
+    review_item_id: str
+    mapping_id: str
+    affected_item_index: int                # stable key into mapping.affected_items
+    item_type: Literal['obligation', 'project', 'document']   # denormalised
+    item_id: str                                              # denormalised
+    decision: Literal['approved', 'overridden', 'dismissed', 'escalated']
+    action: Literal['review', 'amend', 'no_op']               # Rachel's final
+    route: Literal['market_ops', 'legal', 'it_metering']      # Rachel's final
+    rationale: str
+    decided_at: datetime
+    actor: str
+```
+
+Rachel's per-pair decision for a specific (change × asset) pair.
+Absence of an `AssetDecision` for a `(review_item_id,
+affected_item_index)` pair is pending — pending is NOT stored.
+`action` and `route` are copied from the `AffectedItem`'s
+`proposed_action` / `proposed_route` on `approved`; may differ on
+`overridden`.
+
+_Source: [`src/config.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py). `apply_asset_decisions` in [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py) is the single legitimate writer._
 
 ### 2.7 AuditEvent
 
@@ -374,13 +404,20 @@ class AuditEvent(BaseModel):
         'review_item_approved',
         'review_item_overridden',
         'review_item_escalated',
+        'asset_decision_approved',
+        'asset_decision_overridden',
+        'asset_decision_dismissed',
+        'asset_decision_escalated',
         'rollback_executed',
     ]
-    target_type: Literal['proceeding_version', 'change', 'mapping', 'review_item']
+    target_type: Literal[
+        'proceeding_version', 'change', 'mapping', 'review_item', 'asset_decision'
+    ]
     target_id: str
     prior_value_json: str | None            # the full prior Pydantic model as JSON
     new_value_json: str | None
     rationale: str | None
+    batch_id: str | None                    # shared across N bulk-decision events
 ```
 
 _Source: [`src/config.py` L176-L197](https://github.com/ngs2410/strata-build-challenge/blob/main/src/config.py#L176-L197). Append-only JSONL log + `log_event()` helper in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py)._
@@ -705,9 +742,11 @@ _Source: [`src/mapping.py`](https://github.com/ngs2410/strata-build-challenge/bl
     is a no-op, but the cap is active and tunable per tenant for
     the TDD §3.6 scaling-path (a) handoff.
 - LLM response: `MappingResponse` with `affected_items:
-  tuple[AffectedItemByIndex, ...]` (`item_type` + `item_index: int`),
-  `recommended_action`, `routing_destination`, overall `confidence`,
-  `confidence_rationale`, and `rationale`.
+  tuple[AffectedItemByIndex, ...]` (`item_type` + `item_index: int` +
+  `match_confidence` + `match_rationale` + per-item `proposed_action` +
+  per-item `proposed_route`), overall `confidence`,
+  `confidence_rationale`, and `rationale`. No mapping-level
+  recommended_action / routing_destination — TDD §8.6 closed in v1.
 - `src/mapping.py::map_change` then resolves each `item_index` into
   the corresponding `item_id` and returns the persisted `Mapping`
   with `affected_items: tuple[AffectedItem, ...]` (`item_id: str`).
@@ -729,8 +768,8 @@ different scaling pressure. Not mutually exclusive; they combine.
     this obligation?"* Run in parallel across all candidates — Jev's
     architecture explicitly favours this pattern (JEV.md §5).
   - **Jev Noul per candidate project / document**, same shape.
-  - **Jev Choice** for `recommended_action`.
-  - **Jev Choice** for `routing_destination`.
+  - **Jev Choice** per affected item for `proposed_action`.
+  - **Jev Choice** per affected item for `proposed_route`.
   - Deterministic code aggregates Noul probabilities above threshold
     into `affected_items`; applies tenant-config policy for action and
     destination given the Choice distributions.
@@ -761,27 +800,35 @@ different scaling pressure. Not mutually exclusive; they combine.
   state* — exactly what Jev is architected for. The LLM equivalent is
   many sequential or weakly-batched calls with worse cost and worse
   calibration.
-- **`routing_destination` as `Literal`.** v1 ships three destinations
-  matching Verdant's teams; pluggable per-tenant via `DomainConfig` in
-  prod.
-- **Single destination per Change is a v1 scope choice.** The schema
-  captures one primary team per change. Real changes often touch
-  multiple teams; the shape expansion is open-question §8.6 and
-  explicitly out of v1 scope.
+- **Per-item `proposed_route` as `Literal`.** v1 ships three
+  destinations matching Verdant's teams; pluggable per-tenant via
+  `DomainConfig` in prod.
+- **Per-item routing closed in v1 — TDD §8.6.** Each `AffectedItem`
+  carries its own `proposed_route` + `proposed_action`. One Change
+  touching N diverse assets produces N proposals that can route to N
+  different teams. The deferred mapping-level single-destination
+  shape is gone from the schema.
 
 ### 3.7 Review & Audit
 
-**Role.** Rachel approves, overrides, or escalates each `ReviewItem` in
-the queue. Every transition is logged to the append-only audit log.
-Current state (status, owner, action) is a fold over the log — rollback
-is replay-to-timestamp.
+**Role.** Rachel approves, overrides, dismisses, or escalates each
+(change × asset) pair under a `ReviewItem` in the queue. Decisions
+are per-pair (`AssetDecision` — TDD §2.6b) and recorded via
+`apply_asset_decisions` in a single call that covers both single-row
+and bulk UX (multi-select checkboxes share a `batch_id` across the
+emitted audit events). `ReviewItem.status` is a write-time aggregate
+over the AssetDecision set (`_fold_status`: pending > escalated >
+overridden > approved). Pure fold-over-the-audit-log is tracked as
+the TDD §8.8 open question.
 
-_Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py) (`enqueue_mapping` [L59](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L59), `_escalation_threshold` [L79](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L79), `apply_action` [L92](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py#L92)); audit log in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py) (`log_event` [L39](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py#L39))._
+_Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/review_queue.py) (`enqueue_mapping`, `apply_asset_decisions`, `_fold_status`); audit log in [`src/audit_log.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/audit_log.py) (`log_event` with the new `batch_id` kwarg + monotonic counter in `event_id` to defeat microsecond collisions in bulk-apply loops)._
 
 **v1.**
 - `src/review_queue.py` constructs `ReviewItem`s from `Mapping`s.
-  Priority is a function of `mapping.confidence` × a severity proxy
-  (number of affected items).
+  Priority is `mapping.confidence * (1 + pending_count)`. At enqueue
+  pending_count == len(affected_items); each AssetDecision landed
+  recomputes priority — items with the most undecided pairs float
+  to the top.
 - **Escalation gate**: on construction, if `mapping.confidence <
   threshold`, the `ReviewItem` is created with `status='escalated'`
   immediately — bypasses the auto-approval path per CLAUDE.md invariant.
@@ -1567,30 +1614,34 @@ adjustments.
 
 **Trigger.** First week of real reviewer use.
 
-### 8.6 Multi-reviewer routing
+### 8.6 Multi-reviewer routing — **CLOSED in v1**
 
 _Mirrors [PRD §7 bullet "Routing is single-destination in v1"](PRD.md#7-open-questions-and-unvalidated-assumptions)._
 
-**State.** v1 routes each change to a single *primary* destination by
-design — the schema (`Mapping.routing_destination` in `src/config.py`),
-the gold-set schema (`ExpectedMapping.routing_destination` in
-`src/evals.py`), and the mapping prompt + `MAPPING_SPEC` CallSpec in
-`src/mapping.py` all encode one destination per change. This is a
-scope decision, not a modeling claim about reality.
+**State (closed).** v1 ships per-item (action, route) on every
+`AffectedItem`. One `Change` touching N diverse assets produces N
+(`proposed_action`, `proposed_route`) proposals — different items in
+the same `Mapping` can route to different teams. Rachel curates
+per-pair via `AssetDecision` (TDD §2.6b, §3.7) and emits one audit
+event per pair with a shared `batch_id` for bulk operations. The
+mapping-level `recommended_action` / `routing_destination` fields
+that this section originally deferred are gone from the schema —
+replaced by per-item fields on `AffectedItem`.
 
-**Open.** Real regulatory changes often touch multiple teams in
-parallel — e.g. the Order 2222 telemetry requirement belongs primarily
-to IT & Metering but also to Market Operations (which configures DER
-aggregation offers around telemetry data). The current gold case
-labels the primary team per change; secondary teams aren't modelled.
+**Rationale for closing in v1.** The observed Order 2222 §(A) run
+forced four assets (two teams, two action types) into one tuple at
+the mapping level, which hid the diversity from Rachel. The per-item
+model restores fidelity without introducing a workflow engine. The
+one-approval-unblocks-all / all-must-approve question doesn't
+disappear — it collapses to "each pair is its own decision"; cascading
+escalation becomes "escalated pair fold wins the ReviewItem.status
+aggregate" (`_fold_status` in `src/review_queue.py`).
 
-**Next move (v2).** `routing_destinations: tuple[Literal[...], ...]`
-with a primary + CC model. Workflow-engine decisions (one-approval-
-unblocks-all vs. all-must-approve, cascading escalation) are v2 open
-design questions.
-
-**Trigger.** Rachel's feedback shows systematic manual re-routing to a
-second team.
+**Deferred to v2 (narrower).** When ReviewItem-level approval needs
+to notify multiple teams by email / Slack / Linear, the notification
+fan-out layer (NOT the data model) still has to pick who gets
+notified first vs. CC vs. silent. That's a workflow-engine problem,
+not a schema problem. The data model is already shaped for it.
 
 ### 8.7 Audit log behaviour across version transitions
 

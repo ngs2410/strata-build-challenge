@@ -10,10 +10,16 @@ Read this before writing or substantially editing any `PromptSpec`. The first dr
 
 Each LLM task gets its own module containing the trio: **prompt builder**, **response Pydantic model**, **`CallSpec`**. Nothing else in that trio goes in orchestrator modules.
 
-- Workflow-stage LLM tasks → the matching stage directory (`src/extraction/obligation_extraction.py`, `src/mapping/change_to_obligation.py`, `src/citation/citation_verify.py`, `src/diff/draft_vs_final.py`, etc.)
-- Shared calibration text → programmatically built from a data source (see §10), not hand-maintained strings
+The v1 layout is flat — four LLM tasks live in four modules at the top of `src/` (with the two citation-stage modules kept in a `src/citation/` sub-package because citation grounding is a project depth area with multiple files):
 
-Then wire the task into `src/prompt_registry.py` and add a `TaskModelConfig` entry under `task_model_configs` in `config/default_domain_config.json`.
+- [`src/version_diff.py`](src/version_diff.py) — the `version_diff` task
+- [`src/citation/citation_verify.py`](src/citation/citation_verify.py) — the `citation_verify` task
+- [`src/obligation_extraction.py`](src/obligation_extraction.py) — the `obligation_extraction` task
+- [`src/mapping.py`](src/mapping.py) — the `mapping` task
+
+Shared calibration text (change-type rubric, obligation taxonomy, confidence levels, mapping confidence levels, recommended-action rubric, routing-destination glossary, regulated-entity perspective rule) lives in [`src/prompt_calibration.py`](src/prompt_calibration.py) — programmatically built from source `dict`s via `_build_*` helpers (see §10), not hand-maintained strings.
+
+Then wire the task into [`src/prompt_registry.py`](src/prompt_registry.py) and add a `TaskModelConfig` entry under `task_model_configs` in [`config/default_domain_config.json`](config/default_domain_config.json).
 
 ---
 
@@ -74,7 +80,7 @@ Numbered procedure, usually 4–8 top-level steps with optional sub-steps (`1a`,
 
 Legitimate `details` content:
 
-- Disambiguation precedence rules (`src/ingest/proceeding_ingest.py`'s "docket metadata > order caption > filing cover sheet")
+- Disambiguation precedence rules (e.g. `src/prompt_calibration.py`'s `REGULATED_ENTITY_PERSPECTIVE`: "burden heavier/lighter judgments resolve from the regulated entity's compliance surface, NOT the regulator's authority")
 - Decision procedures for confusable judgment calls ("REPORTING vs PROCEDURAL: does the obligation require a submission from the company, or does it govern the process by which an existing obligation must be executed?") — note this is a *procedure*, not a rubric; rubrics are the labelled value definitions themselves
 - **Worked examples** — the single most effective calibration technique. For smaller prompts, a 3–4 line `Example N — <verdict>:` block per major judgment axis is appropriate.
 
@@ -124,7 +130,7 @@ Values are strings; empty strings and `None` are automatically skipped during re
 
 **Wrap multi-line prose inputs in explicit delimiters.** Whenever an input value is free-form prose that may span multiple paragraphs (conversation text, thread prose, article body, document excerpt), wrap it in the builder with `--- start of <name> ---` / `--- end of <name> ---` markers. Without delimiters, when several inputs render back-to-back under `## Inputs`, the boundary of a multi-line prose value blurs into the next input's label or the next section header, and long prose in the middle of a prompt effectively gets "lost" — the model skips over it or merges it with neighbouring content.
 
-Example (from `src/extraction/obligation_extraction.py`):
+Example (from `src/obligation_extraction.py`):
 ```python
 'passage_text': (
   '--- start of passage ---\n'
@@ -133,7 +139,7 @@ Example (from `src/extraction/obligation_extraction.py`):
 ),
 ```
 
-Used consistently across `src/extraction/obligation_extraction.py` (`passage_text`, `surrounding_context`), `src/diff/version_diff.py` (`prior_version_text`, `new_version_text`), `src/mapping/change_to_obligation.py` (`change_summary`), and `src/citation/citation_verify.py` (`cited_passage`). Apply to any input that contains newlines. Short scalar values (obligation types, IDs, dates, single-phrase summaries) don't need wrapping.
+Used consistently across `src/obligation_extraction.py` (`passage_text`), `src/version_diff.py` (`prior_version_text`, `new_version_text`), `src/citation/citation_verify.py` (`claim` — the packed changes-with-citations block), and `src/mapping.py` (`change_description`, `obligation_candidates`, `project_candidates`, `document_candidates`). Apply to any input that contains newlines. Short scalar values (obligation types, IDs, dates, single-phrase summaries) don't need wrapping.
 
 ---
 
@@ -164,17 +170,17 @@ The `json_example` is a **template**, not a realistic grounded example. Its purp
 
 Nullable strings are the one subtlety: when the non-null value is a string, keep the placeholder quoted and mention `null` in the description (`"<verbatim span from predecessor, or null>"`). When the non-null value is an int/float/bool, unquote and use `|null` (`<int|null>`).
 
-**When to use literal values instead of placeholders:** when the LLM should always output that exact value at this stage because the field is an invariant at this step (e.g. `src/extraction/obligation_extraction.py` uses `"obligation_id": null` and `"verified": false` because obligation resolution and citation verification both happen in later stages — the LLM must always emit those exact values here). The rule: placeholder when the model is choosing, literal when the value is invariant at this stage.
+**When to use literal values instead of placeholders:** when the field is an invariant at this step — the LLM should always output that exact value because the real value is set by a later stage. The rule: placeholder when the model is choosing, literal when the value is invariant at this stage. Strata v1 pushes most such invariants to the harness rather than making the LLM emit them (`change_id`, `tenant_id`, `environment`, `extraction_id`, `mapping_id`, `detected_at` are all harness-filled, not LLM-emitted — see the "The harness owns ... — do NOT emit these fields" line in each prompt's Field Intents), so no current prompt uses literal-invariants in its JSON example. The convention stands for prompts that genuinely need a literal invariant at an intermediate stage.
 
 **Lists:** show one element in the array template with its full object shape expanded. Don't show `[...]` or empty arrays unless empty is the invariant expected value.
 
 **Nested objects:** expand fully. Never elide nested structure with `{}` or `...`.
 
-**"Also valid when ..." secondary examples:** use sparingly, only when showing a minimal-form variant genuinely clarifies a conditional output shape. `obligation_extraction` (no-predecessor-version variant) and `change_summary` (`"delta": null` variant for a newly-added obligation) are the two precedents. Do **not** use this to show both branches of a categorical output — a single placeholder with a descriptive note handles that in one example.
+**"Also valid when ..." secondary examples:** use sparingly, only when showing a minimal-form variant genuinely clarifies a conditional output shape. `src/version_diff.py` is the Strata precedent — its JSON Output Example shows the base shape with both `prior_citation` and `new_citation` as objects, then two secondary "Also valid when change_type='added' — the whole prior_citation object is null" / "Also valid when change_type='removed' — the whole new_citation object is null" blocks because the nullability conditioning is non-obvious without an explicit example. Do **not** use this to show both branches of a categorical output — a single placeholder with a descriptive note handles that in one example.
 
 ### Past mistakes (don't repeat)
 
-1. **Grounded realistic examples** — first draft of `obligation_match` used `"matched_obligation_id": "OBL-042"` and a full reasoning sentence about a specific California PUC docket. Wrong: the model will pattern-match the real-looking values and fabricate similar ones. Fix: use descriptive placeholders.
+1. **Grounded realistic examples** — if a JSON example uses `"matched_obligation_id": "OBL-042"` or a full reasoning sentence about a specific California PUC docket, the model will pattern-match the real-looking values and fabricate similar ones in production outputs. Fix: use descriptive placeholders (`"<matched obligation id>"`, `"<one-sentence reasoning tied to the specific overlap>"`).
 2. **Single-line JSON** — compresses the example and makes nested shape hard to read. All examples must be pretty-printed.
 3. **Quoted numeric / boolean placeholders** — never write `"confidence": "<float 0.0-1.0>"` or `"active": "<true|false>"`. Those placeholders teach the model that the value is a string literal. Use `<float 0.0-1.0>` and `<true|false>` unquoted. Same rule applies to `<int>` and `<int|null>`.
 
@@ -188,7 +194,7 @@ When the LLM needs to pick one or more items from a finite list passed in as inp
 
 LLMs are error-prone when asked to reproduce long opaque strings (`dr-abc123def456`, `c_9f8a7b6e`, UUIDs, ticket IDs, hashed keys). They substitute characters, truncate, hallucinate plausible-looking but wrong IDs, or merge IDs across items. Integer indexes into a short list are small, ordered, and impossible to confuse — the model only needs to count.
 
-`src/mapping/change_to_obligation.py` is the exemplar: the mapping prompt renders candidate company obligations with numeric ids (`id: int`) and the response model `MappedObligationResult.id: int` references those positions. The caller owns the index → obligation mapping.
+`src/mapping.py` is the exemplar: the mapping prompt renders candidate obligations / projects / documents with `[0]`, `[1]`, ... index prefixes, and the response model `AffectedItemByIndex.item_index: int` references those positions. `src/mapping.py::_resolve_affected_item` owns the index → real-id translation after the LLM returns. The same pattern is in `src/version_diff.py` and `src/obligation_extraction.py` via `LlmCitation.passage_index: int` (0-based index into the version's passage list) which `citation_grounding._resolve` translates to the real `passage_id`.
 
 ### When this applies
 
@@ -371,8 +377,7 @@ The registry key = the `task_name` used when calling `model_caller.call(task_nam
 
 ```json
 "my_task": {
-  "backend_type": "llm",
-  "model_identifier": "gpt-5.4-nano",
+  "model_identifier": "openai://gpt-5.4-nano",
   "max_tokens": 2048,
   "reasoning_effort": "low",
   "verbosity": "low",
@@ -380,13 +385,13 @@ The registry key = the `task_name` used when calling `model_caller.call(task_nam
 }
 ```
 
-`included_inputs: []` is the default; keep it unless you genuinely need to filter inputs (overwhelmingly rare — most tasks render every key in `inputs_dict`).
+`included_inputs: []` is the default; keep it unless you genuinely need to filter inputs (overwhelmingly rare — most tasks render every key in `inputs_dict`). The `model_identifier` includes the backend URL prefix (`openai://`, `jev://`, `stub://`) which `Backend.matches` dispatches on; the backend is NOT a separate config field.
 
-Token budget guidance for nuanced vs. simple tasks:
-- `obligation_extraction` and `change_summary` → `max_tokens >= 4096` (reasoning exhaustion on multi-dimensional classification)
-- `change_to_obligation` (candidate-list mapping) → `reasoning_effort: 'low'` with `max_tokens=8192` (long candidate lists + rationale)
-- Short-label tasks (`action_recommender`, `escalation_tag`, `draft_vs_final`) → `max_tokens >= 512`
-- Cheap/fast tasks (`citation_verify`, `obligation_match`, metadata extraction) → `nano` model with `reasoning_effort: 'low'`
+Token budget guidance for Strata's four v1 tasks (as calibrated against gpt-5.4-nano runs on the Order 2222 wedge — all four use `reasoning_effort: 'low'`, `verbosity: 'low'`):
+- `version_diff` (two full passage lists in-context, structured response with per-change citations) → `max_tokens >= 2048`
+- `citation_verify` (one batch call over every change, per-citation verdict) → `max_tokens >= 1024`
+- `obligation_extraction` (one call per version, per-passage structured extraction) → `max_tokens >= 2048`
+- `mapping` (one call per Change, long candidate list + per-item action/route + rationale) → `max_tokens >= 2048`
 
 ### Caller boilerplate
 
@@ -415,10 +420,14 @@ Pass `task_config.included_inputs` through to `render()`. Always pass `inputs_di
 
 When the same taxonomy or reference text appears in multiple prompts, **build it programmatically from a data source** and import it. Never copy-paste.
 
-Exemplars:
-- `OBLIGATION_TYPES` (dict) → `OBLIGATION_TAXONOMY_REFERENCE` (string, built by `_build_obligation_taxonomy()`) — imported by `obligation_extraction`, `change_to_obligation`, and `action_recommender`.
-- `CHANGE_SEVERITY_LEVELS` → `CHANGE_SEVERITY_REFERENCE` — imported by `version_diff`, `change_summary`, and `confidence_scoring`.
-- `JURISDICTION_DISAMBIGUATION` — shared across `proceeding_ingest` and `change_to_obligation`.
+Exemplars (all in [`src/prompt_calibration.py`](src/prompt_calibration.py)):
+- `OBLIGATION_TYPES` (dict) → `OBLIGATION_TAXONOMY_REFERENCE` (string, built by `_build_obligation_taxonomy()`) — imported by `obligation_extraction`. The reference embeds `REGULATED_ENTITY_PERSPECTIVE` so the extractor never treats regulator-side duties as entity obligations.
+- `CHANGE_TYPES` (dict) → `CHANGE_TYPE_RUBRIC` (string, built by `_build_change_type_rubric()`) — imported by `version_diff`. Also embeds `REGULATED_ENTITY_PERSPECTIVE` so the tightened-vs-loosened call always reasons from the regulated entity's view.
+- `CONFIDENCE_LEVELS` (dict) → `CONFIDENCE_LEVEL_RUBRIC` — imported by `version_diff`, `obligation_extraction`, `citation_verify` for the 0–5 self-report scale with the "over-confidence is worse than under-confidence" rule.
+- `MAPPING_CONFIDENCE_LEVELS` (dict) → `MAPPING_CONFIDENCE_RUBRIC` — imported by `mapping`. Semantic-overlap confidence (NOT citation-support — the generic rubric doesn't fit mapping) with an explicit emission floor at 3 (candidates that would score ≤2 are omitted entirely rather than hedged).
+- `RECOMMENDED_ACTIONS` (dict) → `RECOMMENDED_ACTION_RUBRIC` — imported by `mapping`. Per-item `AffectedItem.proposed_action` ∈ {review, amend, no_op} with decision rules for picking each (TDD §8.6 closed in v1 — per-item, not mapping-level).
+- `ROUTING_DESTINATIONS` (dict) → `ROUTING_DESTINATION_GLOSSARY` — imported by `mapping`. Per-item `AffectedItem.proposed_route` ∈ {market_ops, legal, it_metering} with "Owns ... / Does NOT own ..." scope paragraphs that prevent the LLM from routing by keyword match.
+- `REGULATED_ENTITY_PERSPECTIVE` (bare string) — the project's convention that burden-direction judgments resolve from the regulated entity's compliance surface. Baked into both `CHANGE_TYPE_RUBRIC` and `OBLIGATION_TAXONOMY_REFERENCE`; also importable standalone for any future rubric that needs the rule without the full taxonomy.
 
 Benefits: Literal types and calibration text never drift. Adding a new obligation type once updates everywhere.
 
@@ -439,7 +448,7 @@ See TEST_QUALITY.md for the authoritative rules. Prompt-specific patterns:
    - `system` contains role-framing language.
 5. **Quality invariants** — e.g. `test_obligation_type_jurisdiction_free` audits fixture data to enforce "no jurisdiction-specific vocabulary leaks into generic obligation-type fields." Write one of these for any rule that would be catastrophic to violate in production.
 
-Test file naming is simple — examples: `test_version_diff.py`, `test_obligation_extraction.py`, `test_change_to_obligation.py`.
+Test file naming is simple: `test_<module>.py` for shared infrastructure (`test_llm.py`, `test_model_caller.py`, `test_prompt_calibration.py`, `test_web_app.py`, `test_stores.py`, `test_backends.py`, `test_openai_backend.py`, `test_ingest.py`, `test_telemetry.py`, `test_tenant_registry.py`, `test_prompt_registry.py`, `test_config.py`, `test_evals.py`). In v1 the four LLM-task tests are consolidated into `test_pipeline.py` (which also covers pipeline orchestration + grounding + review-queue tests) because the per-task test counts are small; split into per-task files when any one task's test count exceeds ~20.
 
 ---
 
@@ -448,7 +457,7 @@ Test file naming is simple — examples: `test_version_diff.py`, `test_obligatio
 When adding a new LLM task, work through this list in order:
 
 ### Design
-- [ ] Chosen module location (the matching workflow-stage directory under `src/`).
+- [ ] Chosen module location (one of the four existing prompt-building modules per §1, or a new flat module in `src/` if the task is a genuinely new LLM responsibility — v1 does not have per-stage sub-packages).
 - [ ] Identified all required inputs and their labels.
 - [ ] Drafted the response model with `Literal` types for every categorical field.
 - [ ] For any "pick item(s) from this list" field, used `int` index rather than `str` ID (§5).
@@ -511,12 +520,11 @@ When adding a new LLM task, work through this list in order:
 
 - `src/llm.py` — `PromptSpec`, `CallSpec`, `INPUT_LABELS`, `_render_inputs`, `PromptSpec.render`
 - `src/prompt_registry.py` — task registration
-- `src/config.py` — `TaskModelConfig`
-- `src/extraction/obligation_extraction.py` — exemplar for `details` taxonomy embedding, worked examples, and structural invariants
-- `src/mapping/change_to_obligation.py` — exemplar for shared calibration constants and integer-index-based list selection (§5)
-- `src/extraction/change_summary.py` — exemplar for nested response models and placeholder-style `json_example`
-- `src/diff/version_diff.py` — exemplar for multi-line prose inputs with explicit delimiters
-- `src/citation/citation_verify.py` — exemplar for post-generation verification prompts (claim ↔ cited passage)
-- `src/ingest/proceeding_ingest.py` — exemplar for self-contained (no shared constants) prompts
-- `CLAUDE.md` — governs `Literal` usage, `extra='forbid'`, no-validators, no-defaults, one-module-per-LLM-task
+- `src/prompt_calibration.py` — shared taxonomies + rubrics + perspective rule (see §10 exemplars)
+- `src/config.py` — `TaskModelConfig`, `DomainConfig`
+- `src/obligation_extraction.py` — exemplar for `details` taxonomy embedding (`OBLIGATION_TAXONOMY_REFERENCE` with perspective rule baked in), six worked examples teaching regulator-side filter + content-specification merge, and the `## Steps` → `## Details` → `## Rubrics` → `## Pitfalls` → `## Field Intents` structural shape
+- `src/mapping.py` — exemplar for shared calibration constants (`MAPPING_CONFIDENCE_RUBRIC` + `RECOMMENDED_ACTION_RUBRIC` + `ROUTING_DESTINATION_GLOSSARY` all composed into one `rubrics` block) and integer-index-based list selection (`AffectedItemByIndex.item_index`, §5) with per-item `proposed_action` + `proposed_route`
+- `src/version_diff.py` — exemplar for multi-line prose inputs with explicit delimiters (`--- start / end ---`), prefix-caching-friendly section ordering (Task → Steps → Details → Rubrics → Pitfalls → Field Intents → JSON Output Example → Inputs — Inputs LAST so the prefix is byte-identical across calls), and the perspective-rule embedding via `CHANGE_TYPE_RUBRIC`
+- `src/citation/citation_verify.py` — exemplar for post-generation verification prompts (claim ↔ cited passage), short-circuit on upstream grounding failure (`is_grounding_pending`), and the `GROUNDING_FAILED` marker rendering that keeps the LLM focused on sides that actually need its judgment
+- `CLAUDE.md` — governs `Literal` usage, `extra='forbid'`, no-validators, no-defaults, no-silent-fallbacks, one-module-per-LLM-task
 - `TEST_QUALITY.md` — authoritative testing rules

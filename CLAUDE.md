@@ -50,6 +50,9 @@ scripts/                            CLI entry points (all main_*.py, use absl fl
   main_review.py                    Launch the FastAPI web view (uvicorn wrapper)
   main_eval.py                      Run evals end-to-end
 tests/                              Pytest tests — test file naming: test_version_diff.py (not test_diff_version_diff.py)
+docs/
+  eval-results/                     Committed dated eval-report markdowns + reading guide (regenerate via `make eval-report`)
+images/                             Screenshots referenced from README.md (queue + audit page)
 ```
 
 ## Code Style

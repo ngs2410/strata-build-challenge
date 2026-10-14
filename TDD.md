@@ -653,6 +653,14 @@ _Source: [`src/version_diff.py`](https://github.com/ngs2410/strata-build-challen
   fields. That's LLM territory. Where Jev fits (change-type
   classification, severity scoring) is *after* generation, in
   production.
+- **Single first-draft + first-final pair diffed per run.** The
+  pipeline picks the first `status='draft'` and first `status='final'`
+  version from the manifest (`src/pipeline.py:119`); additional
+  versions in the manifest (a NOPR revision, an Order on Rehearing)
+  are ingested and persisted but not diffed. The manifest format and
+  `ProceedingVersion.status` taxonomy already accommodate an
+  unbounded version sequence; iterating adjacent-pair diffs over the
+  sorted sequence is a post-wedge add.
 
 ### 3.3 Citation Grounding (depth area)
 

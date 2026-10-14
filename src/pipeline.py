@@ -116,6 +116,7 @@ def run_pipeline(tenant_id: str, environment: str, dry_run: bool = False) -> Pip
     documents=len(documents),
   )
 
+  # v1: first (draft, final) pair only; no loop over additional manifest entries (TDD §3.2).
   nopr = next(v for v in versions if v.status == 'draft')
   final = next(v for v in versions if v.status == 'final')
 

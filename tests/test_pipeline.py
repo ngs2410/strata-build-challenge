@@ -568,6 +568,27 @@ def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side()
   )
 
 
+def test_obligation_extraction_prompt_teaches_content_specification_merge():
+  # Observed over-split at gpt-5.4-nano on §(B): the LLM extracted
+  # "The registration shall include the physical location..." as a
+  # separate obligation from "The aggregator shall register each DER".
+  # The content-specification sentence has no independent compliance
+  # surface — violating it is violating the SAME registration duty.
+  # Example 6 (hypothetical FinCEN CTR filing with content spec)
+  # teaches the merge; the matching Pitfall names the "The X shall
+  # include Y, Z" pattern.
+  version = _version('draft', 'nopr')
+  prompt = build_obligation_extraction_prompt(version)
+  _, user = prompt.render()
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  assert 'Example 6' in details_section
+  assert 'currency transaction report' in details_section
+  assert 'content specification' in details_section.lower() or 'CONTENT' in details_section
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'shall include' in pitfalls_section
+  assert 'independent compliance surface' in pitfalls_section
+
+
 def test_obligation_extraction_prompt_teaches_process_as_subject_filter():
   # Observed failure mode at gpt-5.4-nano: §(A)'s "The aggregator
   # registration process shall not include a minimum size requirement"

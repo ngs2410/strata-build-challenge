@@ -41,6 +41,7 @@ import orjson
 from pydantic import BaseModel
 
 from src.config import (
+  AssetDecision,
   AuditEvent,
   Change,
   Document,
@@ -124,4 +125,5 @@ extracted_obligation_store: Store[ExtractedObligation] = JsonStore(
 )
 mapping_store: Store[Mapping] = JsonStore(Mapping, 'mappings.json')
 review_item_store: Store[ReviewItem] = JsonStore(ReviewItem, 'review_items.json')
+asset_decision_store: Store[AssetDecision] = JsonStore(AssetDecision, 'asset_decisions.json')
 audit_log_store: JsonlStore[AuditEvent] = JsonlStore(AuditEvent, 'audit_log.jsonl')

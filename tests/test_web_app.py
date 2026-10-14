@@ -28,10 +28,12 @@ def test_queue_renders_review_items_after_pipeline(verdant_grid_seeded):
   assert response.status_code == 200
   assert 'Review Queue' in response.text
   assert "Items awaiting Rachel's decision" in response.text
-  assert 'Approve' in response.text
-  assert 'Override' in response.text
-  assert 'Escalate' in response.text
+  # Per-pair proposed_route surfaces on every affected item — at least
+  # one of the three team strings must appear.
   assert 'market_ops' in response.text or 'legal' in response.text or 'it_metering' in response.text
+  # Per-pair action/route edit UI lands in commit 5; the current cards
+  # show the proposals inline but no edit controls yet.
+  assert 'per-pair actions coming in UI rebuild' in response.text
 
 
 def test_queue_renders_citation_span_inline_with_mark(verdant_grid_seeded):
@@ -68,49 +70,6 @@ def test_audit_renders_events_after_pipeline(verdant_grid_seeded):
   assert 'Rollback is tracked as open question TDD §8.8' in response.text
 
 
-def test_post_action_approves_and_redirects(verdant_grid_seeded):
-  del verdant_grid_seeded
-  from src.stores import review_item_store
-
-  run_pipeline('verdant_grid', 'prod', dry_run=False)
-  pending = next(
-    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
-  )
-  response = _client().post(
-    f'/queue/{pending.review_item_id}/action',
-    data={
-      'tenant_id': 'verdant_grid',
-      'environment': 'prod',
-      'action': 'approve',
-      'rationale': 'ok',
-      'actor': 'rachel',
-    },
-  )
-  assert response.status_code == 303
-  assert response.headers['location'] == '/queue?tenant_id=verdant_grid&environment=prod'
-  stored = next(
-    i
-    for i in review_item_store.load_all('verdant_grid', 'prod')
-    if i.review_item_id == pending.review_item_id
-  )
-  assert stored.status == 'approved'
-
-
-def test_post_action_rejects_invalid_action(verdant_grid_seeded):
-  del verdant_grid_seeded
-  from src.stores import review_item_store
-
-  run_pipeline('verdant_grid', 'prod', dry_run=False)
-  pending = next(
-    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
-  )
-  response = _client().post(
-    f'/queue/{pending.review_item_id}/action',
-    data={
-      'tenant_id': 'verdant_grid',
-      'environment': 'prod',
-      'action': 'bogus',
-      'rationale': 'ok',
-    },
-  )
-  assert response.status_code == 422
+# Per-pair /decide POST route tests land in commit 5 alongside the queue
+# UI rebuild. The old /action route (one decision per mapping) was
+# removed when apply_action was replaced by apply_asset_decisions.

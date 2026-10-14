@@ -962,104 +962,246 @@ def test_pipeline_dry_run_persists_nothing_under_env_dir(verdant_grid_seeded):
     assert list(env_dir.iterdir()) == []
 
 
-def test_apply_action_approve_transitions_status_and_logs_event(verdant_grid_seeded):
-  from src.audit_log import audit_log_store
-  from src.review_queue import apply_action
-  from src.stores import review_item_store
+def _asset_input(index, decision='approved', action='amend', route='legal', rationale='ok'):
+  return {
+    'affected_item_index': index,
+    'decision': decision,
+    'action': action,
+    'route': route,
+    'rationale': rationale,
+  }
+
+
+def test_apply_asset_decisions_single_approve_creates_decision_and_updates_item(
+  verdant_grid_seeded,
+):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import asset_decision_store, mapping_store, review_item_store
 
   run_pipeline('verdant_grid', 'prod', dry_run=False)
   items_before = review_item_store.load_all('verdant_grid', 'prod')
   pending = next(i for i in items_before if i.status == 'pending')
-  updated = apply_action(
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  # Deciding ONE affected_item leaves the item in 'pending' because there
+  # are still undecided pairs.
+  updated = apply_asset_decisions(
     tenant_id='verdant_grid',
     environment='prod',
     review_item_id=pending.review_item_id,
-    action='approve',
+    inputs=[
+      _asset_input(
+        0,
+        decision='approved',
+        action=mapping.affected_items[0].proposed_action,
+        route=mapping.affected_items[0].proposed_route,
+        rationale='looks good',
+      )
+    ],
     actor='rachel',
-    rationale='looks good',
+  )
+  assert updated.status == 'pending'  # other items still undecided
+  decisions = asset_decision_store.load_all('verdant_grid', 'prod')
+  mine = [d for d in decisions if d.review_item_id == pending.review_item_id]
+  assert len(mine) == 1
+  assert mine[0].affected_item_index == 0
+  assert mine[0].decision == 'approved'
+  assert mine[0].actor == 'rachel'
+  assert mine[0].item_id == mapping.affected_items[0].item_id
+
+
+def test_apply_asset_decisions_approves_all_items_folds_to_approved(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  inputs = [
+    _asset_input(i, decision='approved', action=a.proposed_action, route=a.proposed_route)
+    for i, a in enumerate(mapping.affected_items)
+  ]
+  updated = apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=inputs,
+    actor='rachel',
   )
   assert updated.status == 'approved'
-  items_after = review_item_store.load_all('verdant_grid', 'prod')
-  stored = next(i for i in items_after if i.review_item_id == pending.review_item_id)
-  assert stored.status == 'approved'
-  events = audit_log_store.load_all('verdant_grid', 'prod')
-  approval_events = [e for e in events if e.kind == 'review_item_approved']
-  assert len(approval_events) == 1
-  assert approval_events[0].target_id == pending.review_item_id
-  assert approval_events[0].actor == 'rachel'
-  assert approval_events[0].rationale == 'looks good'
+  assert updated.priority == mapping.confidence  # pending_count=0 → priority = confidence * 1
 
 
-def test_apply_action_override_sets_overridden_status(verdant_grid_seeded):
-  from src.review_queue import apply_action
+def test_apply_asset_decisions_escalation_wins_fold(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
 
   run_pipeline('verdant_grid', 'prod', dry_run=False)
-  from src.stores import review_item_store
-
   pending = next(
     i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
   )
-  updated = apply_action(
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  inputs = []
+  for i, a in enumerate(mapping.affected_items):
+    decision = 'escalated' if i == 0 else 'approved'
+    inputs.append(
+      _asset_input(i, decision=decision, action=a.proposed_action, route=a.proposed_route)
+    )
+  updated = apply_asset_decisions(
     tenant_id='verdant_grid',
     environment='prod',
     review_item_id=pending.review_item_id,
-    action='override',
+    inputs=inputs,
     actor='rachel',
-    rationale='wrong mapping',
-  )
-  assert updated.status == 'overridden'
-
-
-def test_apply_action_escalate_sets_escalated_status(verdant_grid_seeded):
-  from src.review_queue import apply_action
-
-  run_pipeline('verdant_grid', 'prod', dry_run=False)
-  from src.stores import review_item_store
-
-  pending = next(
-    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
-  )
-  updated = apply_action(
-    tenant_id='verdant_grid',
-    environment='prod',
-    review_item_id=pending.review_item_id,
-    action='escalate',
-    actor='rachel',
-    rationale='needs GC review',
   )
   assert updated.status == 'escalated'
 
 
-def test_apply_action_raises_on_unknown_action(verdant_grid_seeded):
-  from src.review_queue import apply_action
+def test_apply_asset_decisions_override_wins_over_approved(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
 
   run_pipeline('verdant_grid', 'prod', dry_run=False)
-  from src.stores import review_item_store
-
-  item = review_item_store.load_all('verdant_grid', 'prod')[0]
-  with pytest.raises(ValueError, match='unknown review action'):
-    apply_action(
-      tenant_id='verdant_grid',
-      environment='prod',
-      review_item_id=item.review_item_id,
-      action='bogus',  # type: ignore[arg-type]
-      actor='x',
-      rationale='x',
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  inputs = []
+  for i, a in enumerate(mapping.affected_items):
+    decision = 'overridden' if i == 0 else 'approved'
+    inputs.append(
+      _asset_input(i, decision=decision, action=a.proposed_action, route=a.proposed_route)
     )
+  updated = apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=inputs,
+    actor='rachel',
+  )
+  assert updated.status == 'overridden'
 
 
-def test_apply_action_raises_on_unknown_review_item_id(verdant_grid_seeded):
-  from src.review_queue import apply_action
+def test_apply_asset_decisions_bulk_writes_multiple_decisions_in_one_call(
+  verdant_grid_seeded,
+):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import asset_decision_store, mapping_store, review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  # Bulk-decide the first two items in one call.
+  inputs = [
+    _asset_input(0, decision='approved', action=mapping.affected_items[0].proposed_action,
+                 route=mapping.affected_items[0].proposed_route),
+    _asset_input(1, decision='dismissed', action=mapping.affected_items[1].proposed_action,
+                 route=mapping.affected_items[1].proposed_route),
+  ]
+  apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=inputs,
+    actor='rachel',
+  )
+  decisions = asset_decision_store.load_all('verdant_grid', 'prod')
+  mine = sorted(
+    (d for d in decisions if d.review_item_id == pending.review_item_id),
+    key=lambda d: d.affected_item_index,
+  )
+  assert [d.affected_item_index for d in mine] == [0, 1]
+  assert mine[0].decision == 'approved'
+  assert mine[1].decision == 'dismissed'
+
+
+def test_apply_asset_decisions_priority_decreases_as_decisions_land(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import mapping_store, review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  mapping = next(
+    m for m in mapping_store.load_all('verdant_grid', 'prod') if m.mapping_id == pending.mapping_id
+  )
+  pending_count_at_enqueue = len(mapping.affected_items)
+  assert pending.priority == mapping.confidence * (1 + pending_count_at_enqueue)
+  # Land ONE decision — pending_count drops by 1 — priority drops.
+  updated = apply_asset_decisions(
+    tenant_id='verdant_grid',
+    environment='prod',
+    review_item_id=pending.review_item_id,
+    inputs=[
+      _asset_input(
+        0,
+        decision='approved',
+        action=mapping.affected_items[0].proposed_action,
+        route=mapping.affected_items[0].proposed_route,
+      )
+    ],
+    actor='rachel',
+  )
+  assert updated.priority == mapping.confidence * pending_count_at_enqueue
+
+
+def test_apply_asset_decisions_raises_on_unknown_review_item(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
 
   run_pipeline('verdant_grid', 'prod', dry_run=False)
   with pytest.raises(ValueError, match='review_item_id not found'):
-    apply_action(
+    apply_asset_decisions(
       tenant_id='verdant_grid',
       environment='prod',
       review_item_id='does-not-exist',
-      action='approve',
+      inputs=[_asset_input(0)],
       actor='x',
-      rationale='x',
+    )
+
+
+def test_apply_asset_decisions_raises_on_out_of_range_index(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+  from src.stores import review_item_store
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  pending = next(
+    i for i in review_item_store.load_all('verdant_grid', 'prod') if i.status == 'pending'
+  )
+  with pytest.raises(ValueError, match='out of range'):
+    apply_asset_decisions(
+      tenant_id='verdant_grid',
+      environment='prod',
+      review_item_id=pending.review_item_id,
+      inputs=[_asset_input(99)],
+      actor='x',
+    )
+
+
+def test_apply_asset_decisions_raises_on_empty_inputs(verdant_grid_seeded):
+  from src.review_queue import apply_asset_decisions
+
+  run_pipeline('verdant_grid', 'prod', dry_run=False)
+  with pytest.raises(ValueError, match='at least one input'):
+    apply_asset_decisions(
+      tenant_id='verdant_grid',
+      environment='prod',
+      review_item_id='any-id',
+      inputs=[],
+      actor='x',
     )
 
 

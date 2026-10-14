@@ -100,20 +100,12 @@
             </details>
           {% endif %}
 
-          {% if row.item.status in ['pending', 'escalated'] %}
-            <form class="action-form" method="post" action="/queue/{{row.item.review_item_id}}/action">
-              <input type="hidden" name="tenant_id" value="{{tenant_id}}">
-              <input type="hidden" name="environment" value="{{environment}}">
-              <textarea name="rationale" placeholder="Rationale for this decision…" required></textarea>
-              <div class="action-row">
-                <button type="submit" class="btn btn-ghost" name="action" value="escalate">Escalate</button>
-                <button type="submit" class="btn btn-ghost" name="action" value="override">Override</button>
-                <button type="submit" class="btn btn-primary" name="action" value="approve">Approve</button>
-              </div>
-            </form>
-          {% else %}
-            <div class="no-action">No action available — item is {{row.item.status}}.</div>
-          {% endif %}
+          {# Per-pair action UI lands in commit 5 (queue UI rebuild). The old
+             mapping-level approve/override/escalate form was removed when
+             apply_action was replaced by apply_asset_decisions. #}
+          <div class="no-action">
+            Status: {{row.item.status}} — per-pair actions coming in UI rebuild.
+          </div>
         </div>
       </article>
     {% endfor %}

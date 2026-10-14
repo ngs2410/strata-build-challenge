@@ -1,7 +1,8 @@
 '''FastAPI web view — Rachel's review-queue + audit-log pages.
 
 Programmable surface per CLAUDE.md "API first": HTTP JSON (and here,
-Jinja2-rendered HTML) is the v1 consumer-facing shape. Three GETs + one POST:
+Jinja2-rendered HTML) is the v1 consumer-facing shape. Three GETs today;
+the per-pair /decide POST lands in commit 5 (queue UI rebuild).
 
   * `GET /` — redirects to the queue for the hard-coded demo tenant
     (`verdant_grid` / `prod`). Convenience for the build-challenge demo.
@@ -13,10 +14,11 @@ Jinja2-rendered HTML) is the v1 consumer-facing shape. Three GETs + one POST:
     happy path it never is).
   * `GET /audit?tenant_id=...&environment=...` — renders the full audit
     log newest-first.
-  * `POST /queue/{review_item_id}/action` — form-encoded
-    `action in {approve, override, escalate}` + `rationale`. Delegates
-    to `src.review_queue.apply_action` which does the status flip + emits
-    the audit event. Redirects back to the queue (303 See Other).
+  * `POST /queue/{review_item_id}/decide` (commit 5) — form-encoded
+    per-pair decisions (checkbox-selected affected_item_indexes + one
+    decision + one action + one route + one rationale). Delegates to
+    `src.review_queue.apply_asset_decisions`. Redirects back to the
+    queue (303 See Other).
 
 Static files are mounted at `/static` from `./static/` (holds
 `strata.css` — the single stylesheet, no JS framework per CLAUDE.md v1
@@ -43,14 +45,12 @@ deployment on tenant-chosen cloud or on-premise is a post-wedge option
 '''
 
 from pathlib import Path
-from typing import Literal
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.review_queue import apply_action
 from src.stores import (
   audit_log_store,
   change_store,
@@ -117,27 +117,9 @@ def audit(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
   )
 
 
-@app.post('/queue/{review_item_id}/action')
-def post_action(
-  review_item_id: str,
-  tenant_id: str = Form(...),
-  environment: str = Form(...),
-  action: Literal['approve', 'override', 'escalate'] = Form(...),
-  rationale: str = Form(...),
-  actor: str = Form('local_user'),
-) -> RedirectResponse:
-  apply_action(
-    tenant_id=tenant_id,
-    environment=environment,
-    review_item_id=review_item_id,
-    action=action,
-    actor=actor,
-    rationale=rationale,
-  )
-  return RedirectResponse(
-    url=f'/queue?tenant_id={tenant_id}&environment={environment}',
-    status_code=303,
-  )
+# Per-pair /decide POST route lands in commit 5 alongside the queue UI
+# rebuild. The old /action POST route (one decision per mapping) was
+# deleted when `apply_action` was replaced by `apply_asset_decisions`.
 
 
 # The store facade raises FileNotFoundError when a tenant/env has no persisted

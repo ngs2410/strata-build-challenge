@@ -283,11 +283,18 @@ def build_mapping_prompt(
       'to look first"; "no_op" means "nothing in the candidate set is '
       'affected". When uncertain between review and amend, prefer '
       'review.\n'
-      '- Do NOT emit confidence=5 on routing_destination when the '
-      'change touches multiple teams\' domains. If the change is a '
-      'tariff edit (legal) AND requires market-eligibility changes '
-      '(market_ops), pick the PRIMARY team and drop confidence to 3-4, '
-      'naming the secondary team in confidence_rationale.'
+      '- Do NOT emit confidence=5 on the overall mapping when '
+      'routing_destination is a multi-team judgment call. If the change '
+      'is a tariff edit (legal) AND requires market-eligibility changes '
+      '(market_ops), pick the PRIMARY team and drop overall confidence '
+      'to 3-4. When overall confidence is 3-4 because of a multi-team '
+      'touch, the confidence_rationale MUST explicitly name BOTH the '
+      'primary team AND the secondary team by name (e.g., "primary '
+      'legal, secondary market_ops because the tariff filing update is '
+      'the near-term artefact but size eligibility is a market-'
+      'participation parameter"). Saying "the primary accountable '
+      'function is legal because..." without naming market_ops is NOT '
+      'sufficient — Rachel needs to know which team to cc.'
     ),
     inputs_dict={
       'change_description': change_summary,

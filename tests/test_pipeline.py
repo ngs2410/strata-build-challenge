@@ -704,6 +704,26 @@ def test_mapping_rubrics_contains_only_confidence_action_and_routing():
   assert 'prevents id hallucination' in field_intents_section
 
 
+def test_mapping_prompt_pitfall_requires_naming_both_teams_on_multi_touch():
+  # Observed at gpt-5.4-nano on §(A) tightened change: nano correctly
+  # dropped overall confidence to 4 (per the multi-team pitfall) but
+  # wrote confidence_rationale="primary accountable function is
+  # legal..." WITHOUT naming market_ops as the secondary team. The
+  # pitfall must explicitly require BOTH team names and give a
+  # concrete example of the right shape.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'MUST explicitly name BOTH' in pitfalls_section
+  # Concrete example form with both team names present.
+  assert 'primary legal, secondary market_ops' in pitfalls_section
+  # Explicit anti-pattern.
+  assert 'Rachel needs to know which team to cc' in pitfalls_section
+
+
 def test_mapping_prompt_pitfalls_reject_hedge_verbs_in_match_rationale():
   # Observed failure mode at gpt-5.4-nano on §(A) tightened change: the
   # model emitted TWO borderline items at match_confidence=3 whose

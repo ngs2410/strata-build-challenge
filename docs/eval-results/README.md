@@ -65,29 +65,6 @@ numbers:
   teaching in commits `871a418`, `bedb038` is partial — the model
   occasionally emits a borderline §A item at nano scale).
 
-## Why change_detection F1 jumped from 0.333 to 1.0 on 2026-10-14
-
-Gold labels were updated to match the shipped rubric conventions:
-
-- §(A) relabelled `loosened` → `tightened`. The regulator-side
-  relaxation ("the RTO/ISO MAY impose a minimum size") creates
-  de facto new burden on the aggregator (now subject to a cap);
-  per `REGULATED_ENTITY_PERSPECTIVE` in
-  `src/prompt_calibration.py`, this is a tightening of the entity's
-  obligation.
-- §(C) relabelled `added` at null/p3 → `tightened` at p3/p3. The
-  telemetry feed is a new parameter grafted onto the existing
-  capability-confirmation duty (Example 3 in the version_diff
-  prompt teaches that parameter grafts are `tightened`, not
-  `added` — see `src/version_diff.py`).
-- §(A) regulator-side obligations dropped from
-  `expected_extractions` (the aggregator has no duty under §(A);
-  it has rights). The two §(A) entries at `passage_position=1`
-  for each version were removed.
-
-The gold labels now reflect the convention the code enforces. If
-the prompt's rubric changes, the gold must be revisited.
-
 ## What these numbers do NOT measure
 
 - **Rachel's actual satisfaction with the queue.** Mapping F1=0.692

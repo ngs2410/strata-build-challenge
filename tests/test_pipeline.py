@@ -27,7 +27,7 @@ from src.config import (
   ProceedingVersion,
 )
 from src.mapping import map_change
-from src.obligation_extraction import extract_obligations
+from src.obligation_extraction import build_obligation_extraction_prompt, extract_obligations
 from src.pipeline import run_pipeline
 from src.review_queue import enqueue_mapping
 from src.version_diff import LlmChange, detect_changes
@@ -566,6 +566,32 @@ def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side()
   assert verified[0].new_citation.verification_rationale == (
     GROUNDING_FAILED_SPAN_NOT_FOUND_RATIONALE
   )
+
+
+def test_obligation_extraction_prompt_has_steps_details_pitfalls_sections():
+  # Parity with version_diff and citation_verify. Scaffolding gives the
+  # LLM an explicit decision procedure, three worked examples from
+  # adjacent domains, and failure-mode guards. The three teaching cases
+  # are (a) one duty → one obligation (SEC Form X-17A-5), (b) one
+  # sentence → two obligations (HIPAA compound), (c) shortest-span
+  # discipline (SEC with modifier).
+  version = _version('draft', 'nopr')
+  prompt = build_obligation_extraction_prompt(version)
+  _, user = prompt.render()
+  assert '## Steps' in user
+  assert '## Details' in user
+  assert '## Pitfalls' in user
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  # Adjacent-domain examples — not Order 2222 (don't teach to test).
+  assert 'X-17A-5' in details_section  # SEC Example 1 and 3
+  assert 'HIPAA' in details_section or 'minimum necessary' in details_section  # HHS Example 2
+  assert 'DER' not in details_section  # Order 2222 teaching-to-test guard
+  # Pitfalls name the four failure modes we're guarding against.
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'split' in pitfalls_section.lower()
+  assert 'merge' in pitfalls_section.lower()
+  assert 'surrounding' in pitfalls_section.lower()
+  assert 'confidence=5' in pitfalls_section
 
 
 def test_extract_obligations_produces_one_entry_per_version():

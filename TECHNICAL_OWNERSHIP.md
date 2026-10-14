@@ -317,34 +317,65 @@ economics" principle.
   `description: str`, `prior_citation: LlmCitation | None`,
   `new_citation: LlmCitation | None`, `confidence: int (0-5)`,
   `confidence_rationale: str`.
-- **Gets wrong**: **cosmetic ↔ substantive confusion**. Pure
-  rewording that preserves meaning should be `change_type='cosmetic'`
-  but the model often promotes it to `tightened` / `loosened`
-  because the phrasing-shift looks semantically loaded. Rubric
-  specifically names this ("Pure rewording that preserves meaning
-  is cosmetic, not material"); still happens. Reliability-diagram
-  evidence would show confusion-matrix off-diagonals on the
-  cosmetic row.
+- **Gets wrong (observed on gpt-5.4-nano, Order 2222)**: three
+  failures in live `--confirm_llm` runs. (1) **Sub-modification
+  over-splitting**: §(B)'s tightening of the registration duty
+  (adding a 60-day timing requirement AND a point-of-interconnection
+  content element to one existing obligation) was initially emitted
+  as TWO separate `added` changes rather than ONE `tightened` change
+  grouping two parameter sub-modifications — the `added` definition
+  did not yet distinguish "wholly-new STANDALONE obligation" from
+  "new parameter grafted onto existing obligation." Fixed by Example
+  3 in `## Details` (hypothetical FinCEN SAR filing with two
+  parameter sub-tightenings) + an explicit grouping rule bullet in
+  the task rubric (commit `cadac6b`). (2) **`passage_id` string
+  hallucination**: the LLM invented IDs like `"prior_A"` that did
+  not exist in either version — grounding raised
+  `ValueError: citation references unknown passage_id: prior_A`.
+  Fixed structurally by switching `LlmCitation` from `passage_id:
+  str` to `passage_index: int` so invented IDs become out-of-range
+  errors (commit `1ecade7`). (3) **Whitespace-collapse inside
+  `citing_span`**: nano routinely drops newlines mid-phrase (emits
+  `"size requirement"` where the passage has `"size\nrequirement"`),
+  breaking the deterministic `.find()` on 4 of 6 citation sides.
+  Fixed structurally in `citation_grounding` by a whitespace-
+  normalized retry that back-maps offsets to the original passage
+  text (commit `7f3a77a`) — rather than prompt-engineering the issue
+  away, since all small models exhibit this pattern.
 
 ### citation_verify
 
 - **Receives**: for each `Change`, a rendered block with the
   change_type + description + both cited passages' text + the
-  specific citing span offsets (so the LLM sees exactly which
-  substring the mapper claimed supported the change).
+  resolved citing span (the substring located by grounding — no
+  offsets, no `passage_id` strings, since those are structural
+  grounding artefacts the LLM can only misread; see commit `3254f73`).
+  Citation sides whose grounding failed upstream render as a
+  `GROUNDING_FAILED (do not verify this side — handled upstream)`
+  marker so the LLM focuses only on sides that need its judgment.
 - **Emits**: `CitationVerificationResponse.verifications:
   tuple[CitationVerificationItem, ...]` with
   `prior_citation_verified: bool | None` +
   `prior_citation_rationale: str | None` (same pair for `new_`).
   `None` when the Change has no citation on that side (added /
   removed cases).
-- **Gets wrong**: **over-affirming**. If the cited passage mentions
-  the same topic as the claim, the model tends to say "yes,
-  supports" even when the passage establishes a *different*
-  obligation than the one described. Mitigation per TDD §3.4
-  Production is to swap the LLM verifier for a Jev Noul with a
-  calibrated probability + a tighter "entailment, not relatedness"
-  framing.
+- **Gets wrong (observed on gpt-5.4-nano, Order 2222)**:
+  **laundering structural grounding failures into semantic
+  verifications**. When upstream grounding failed (the whitespace-
+  collapse case above produced an empty `citing_span` sentinel),
+  the citation still flowed to the verifier with full passage text
+  attached. The LLM would vote `verified=true` based on the passage
+  alone — losing the signal that the structural anchor was missing.
+  Fixed at the merge level by `is_grounding_pending` short-circuit:
+  a citation whose rationale is the grounding-failure sentinel
+  bypasses the LLM entirely and preserves the grounding verdict,
+  and the prompt renders failed sides as a terse
+  `GROUNDING_FAILED (do not verify this side — handled upstream)`
+  marker so the LLM focuses only on sides that need its judgment
+  (commits `21f0442`, `4d9969b`). Also preemptively guarded by
+  Example 2 in `## Details` (right-paragraph-wrong-content): a span
+  IN the right paragraph but describing different content than the
+  described change must still verify as `false` (commit `021b638`).
 
 ### obligation_extraction
 
@@ -356,15 +387,35 @@ economics" principle.
 - **Emits**: `ObligationExtractionResponse.extracted_obligations:
   tuple[LlmExtractedObligation, ...]`. Each has `obligation_type:
   Literal`, `summary: str` (one-sentence), `full_text: str`
-  (verbatim), `citation: LlmCitation(passage_id, citing_span)`,
-  `confidence: int + rationale`.
-- **Gets wrong**: **over-extraction**. One obligation gets split
-  into multiple when the passage uses multiple clauses to describe
-  the same requirement (e.g. "The aggregator shall register each
-  DER…" + "The registration shall include physical location…" are
-  one obligation with its implementation detail, not two). Rubric
-  calls this out as pitfall (b); still happens. Gold scoring
-  catches it as false-positive extractions.
+  (verbatim), `citation: LlmCitation(passage_index: int,
+  citing_span: str)`, `confidence: int + rationale`. `passage_index`
+  rather than `passage_id` prevents the ID-hallucination failure
+  mode observed in `version_diff` (commit `1ecade7`).
+- **Gets wrong (observed on gpt-5.4-nano, Order 2222 NOPR)**: two
+  systemic patterns. (1) **Regulator-side duty extracted as entity
+  obligation**: §(A)'s "The aggregator registration process shall
+  not include a minimum size requirement" was extracted as an
+  aggregator obligation at confidence=5 because the subject phrase
+  surface-mentions "aggregator". The actual grammatical subject is
+  a PROCESS administered by the RTO/ISO — the sentence constrains
+  the RTO's rulemaking authority, not the aggregator's duties.
+  Fixed by baking `REGULATED_ENTITY_PERSPECTIVE` into
+  `OBLIGATION_TAXONOMY_REFERENCE` + Example 5 in `## Details`
+  (hypothetical SEC broker-dealer registration process) teaching
+  the "who ADMINISTERS the process named in the subject?" decision
+  test (commits `bedb038`, `871a418`). (2) **Content-specification
+  over-split**: §(B)'s "The aggregator shall register each DER…"
+  + "The registration shall include physical location…" were
+  extracted as TWO procedural obligations rather than ONE — the
+  content-specification sentence has no independent compliance
+  surface (violating it IS violating the SAME registration duty).
+  Fixed by Example 6 in `## Details` (hypothetical FinCEN CTR
+  filing with content specification) + a matching Pitfall
+  explicitly naming the `"The X shall include Y, Z"` sentence
+  pattern (commit `1090082`). After both fixes, the NOPR run
+  extracts exactly two obligations — §(B) registration (procedural)
+  + §(C) information-provision (procedural / reporting boundary,
+  confidence=4 with the boundary ambiguity named in rationale).
 
 ### mapping
 
@@ -382,14 +433,38 @@ economics" principle.
   `confidence + rationale`, overall `rationale`. **Returns
   indexes, not IDs** — PROMPT_CONVENTIONS.md §5 (LLMs can't echo
   long opaque IDs reliably).
-- **Gets wrong**: **primary-destination miscall when the change
-  genuinely touches multiple teams**. The Order 2222 telemetry
-  change belongs primarily to IT & Metering, but the model
-  sometimes routes to Market Operations (which owns the downstream
-  aggregation offer configuration). This is the TDD §8.6 open
-  question made concrete — v1's single-destination schema makes
-  the right answer unavailable regardless of which team the model
-  picks.
+- **Gets wrong (observed on gpt-5.4-nano, Order 2222 §A tightened
+  change)**: two residual failure patterns after four rounds of
+  prompt tightening. (1) **Topical-adjacency over-mapping with
+  hedge-shaped rationales**: for the size-eligibility change
+  against Verdant Grid's company context, the mapper emitted two
+  borderline items at `match_confidence=3` whose rationales led
+  with hedge verbs — `"may require updating..."` on obligation
+  DER-REG-01, `"should reflect..."` on document DER-OPS-PROC-v3.2.
+  The hedge verb was the signal that the match was reaching for
+  topical adjacency rather than naming substantive effect.
+  Partially fixed by a Pitfall naming the specific hedge verbs
+  (commit `56f9fca`); nano then swapped to `"must reflect"` /
+  `"must update"` and bumped confidence to 4 — the behaviour
+  pattern persists under a different wordlist. (2) **Multi-team
+  routing without naming the secondary team**: overall confidence
+  correctly dropped to 4 per the multi-team-touch Pitfall, but
+  `confidence_rationale` said `"primary accountable function is
+  legal because..."` without naming market_ops as the secondary
+  team — Rachel has to re-derive the multi-team split from scratch.
+  Partially fixed by a Pitfall requiring the explicit "primary X,
+  secondary Y" shape (commit `bfae321`); nano then named primary by
+  team name but described secondary by topic area
+  (`"operational/program impact"` rather than `"market_ops"`). Both
+  patterns are **nano-shaped failures** — the model games specific
+  prompt stricture lists, swapping banned verbs for same-shape
+  synonyms and swapping named-team requirements for topic-area
+  descriptions. Deeper structural enforcement (constrained
+  rationale templates, enum-restricted routing_rationale fields) is
+  either whack-a-mole at this model size or requires a bigger
+  model. The project's fail-closed architecture handles it:
+  Rachel's queue triage is designed exactly for borderline items;
+  nothing silently ships.
 
 ### Underlying mechanism
 

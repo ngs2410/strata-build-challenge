@@ -50,7 +50,7 @@ from src.config import (
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
 from src.prompt_calibration import (
-  CONFIDENCE_LEVEL_RUBRIC,
+  MAPPING_CONFIDENCE_RUBRIC,
   RECOMMENDED_ACTION_RUBRIC,
   ROUTING_DESTINATION_GLOSSARY,
 )
@@ -62,13 +62,13 @@ MAPPING_JSON_EXAMPLE = """{
     {
       "item_type": "<obligation|project|document>",
       "item_index": <int 0-based index into the matching candidate list>,
-      "match_confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "match_confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
       "match_rationale": "<one sentence naming the specific overlap>"
     }
   ],
   "recommended_action": "<review|amend|no_op>",
   "routing_destination": "<market_ops|legal|it_metering>",
-  "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+  "confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
   "confidence_rationale": "<which rubric level you picked and why>",
   "rationale": "<one paragraph summarising WHY this change maps to these items and this team>"
 }"""
@@ -249,7 +249,7 @@ def build_mapping_prompt(
       '— do NOT emit these fields.'
     ),
     rubrics=(
-      CONFIDENCE_LEVEL_RUBRIC
+      MAPPING_CONFIDENCE_RUBRIC
       + '\n\n'
       + RECOMMENDED_ACTION_RUBRIC
       + '\n\n'

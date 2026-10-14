@@ -26,10 +26,16 @@ the same perspective rule):
     (added / removed / tightened / loosened / cosmetic) with definitions,
     prefaced by `REGULATED_ENTITY_PERSPECTIVE`.
   * `CONFIDENCE_LEVEL_RUBRIC` — the 0–5 integer self-report scale used by
-    every task that emits a `confidence` field, paired with the rule
-    "over-confidence is worse than under-confidence" so low-confidence
-    outputs reliably escalate (Strata invariant: the system fails to a
-    reviewer, not to a guess).
+    tasks that emit a `confidence` field grounded in cited passages
+    (version_diff, obligation_extraction, citation_verify). Paired with
+    the rule "over-confidence is worse than under-confidence" so
+    low-confidence outputs reliably escalate (Strata invariant: the
+    system fails to a reviewer, not to a guess).
+  * `MAPPING_CONFIDENCE_RUBRIC` — the mapping-specific 0–5 scale used by
+    `mapping`. Semantic-overlap confidence rather than citation support,
+    with an explicit emission floor at 3 (candidates that would score
+    2 or below are omitted rather than hedged — keeps Rachel's queue
+    noise-free).
   * `RECOMMENDED_ACTION_RUBRIC` — the three `Mapping.recommended_action`
     `Literal` values (no_op / review / amend) with the decision rule
     for picking each. Shared so a future rerouter or triage prompt
@@ -163,6 +169,40 @@ CONFIDENCE_LEVELS: dict[int, str] = {
   0: 'Guess — no defensible anchor in the cited text; escalate.',
 }
 
+MAPPING_CONFIDENCE_LEVELS: dict[int, str] = {
+  5: (
+    'Unambiguous — the change explicitly names the item or an identifier '
+    'the item carries (e.g., the change text mentions "Form X-17A-5" and '
+    'the candidate is the Form X-17A-5 filing obligation).'
+  ),
+  4: (
+    'Strongly supported — the change targets a parameter / scope / '
+    'content that the item directly covers, one short inferential step '
+    'from the change text (e.g., change tightens a filing deadline, '
+    'candidate obligation IS that filing).'
+  ),
+  3: (
+    'Reasonable — the item is substantively affected by the change but '
+    'a reviewer might legitimately disagree about scope (e.g., change '
+    "affects 'DER aggregation operations', candidate project is a "
+    'specific DER aggregation program).'
+  ),
+  2: (
+    'Weak — topically adjacent but the match depends on an inference '
+    'the change text does not clearly support. Below the floor for '
+    'emission: omit the candidate entirely rather than emitting a '
+    'match_confidence=2 hedge.'
+  ),
+  1: (
+    'Speculative — surface keyword overlap with no substantive effect. '
+    'Below the floor for emission.'
+  ),
+  0: (
+    'Guess — no defensible overlap. Below the floor for emission; '
+    'escalate if uncertain.'
+  ),
+}
+
 
 def _build_obligation_taxonomy() -> str:
   lines = [
@@ -205,9 +245,24 @@ def _build_confidence_rubric() -> str:
   return '\n'.join(lines)
 
 
+def _build_mapping_confidence_rubric() -> str:
+  lines = [
+    'Mapping confidence rubric (0-5 integer). Applies to both the overall '
+    'mapping confidence AND to each affected_items[*].match_confidence. '
+    'Match_confidence floor for emission is 3 — candidates that would '
+    'score 2 or below are omitted entirely rather than hedged. '
+    'Over-confidence is a worse failure than under-confidence.',
+    '',
+  ]
+  for level in sorted(MAPPING_CONFIDENCE_LEVELS, reverse=True):
+    lines.append(f'- {level}: {MAPPING_CONFIDENCE_LEVELS[level]}')
+  return '\n'.join(lines)
+
+
 OBLIGATION_TAXONOMY_REFERENCE: str = _build_obligation_taxonomy()
 CHANGE_TYPE_RUBRIC: str = _build_change_type_rubric()
 CONFIDENCE_LEVEL_RUBRIC: str = _build_confidence_rubric()
+MAPPING_CONFIDENCE_RUBRIC: str = _build_mapping_confidence_rubric()
 
 
 RECOMMENDED_ACTIONS: dict[str, str] = {

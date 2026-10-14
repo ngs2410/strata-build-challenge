@@ -3,6 +3,8 @@ from src.prompt_calibration import (
   CHANGE_TYPES,
   CONFIDENCE_LEVEL_RUBRIC,
   CONFIDENCE_LEVELS,
+  MAPPING_CONFIDENCE_LEVELS,
+  MAPPING_CONFIDENCE_RUBRIC,
   OBLIGATION_TAXONOMY_REFERENCE,
   OBLIGATION_TYPES,
   RECOMMENDED_ACTION_RUBRIC,
@@ -29,6 +31,36 @@ def test_obligation_taxonomy_reference_names_every_type_and_includes_examples():
   for name, body in OBLIGATION_TYPES.items():
     assert name in OBLIGATION_TAXONOMY_REFERENCE
     assert body['example'] in OBLIGATION_TAXONOMY_REFERENCE
+
+
+def test_mapping_confidence_levels_cover_full_scale():
+  assert set(MAPPING_CONFIDENCE_LEVELS) == {0, 1, 2, 3, 4, 5}
+
+
+def test_mapping_confidence_rubric_includes_every_level():
+  for level in MAPPING_CONFIDENCE_LEVELS:
+    assert f'- {level}:' in MAPPING_CONFIDENCE_RUBRIC
+
+
+def test_mapping_confidence_rubric_names_the_emission_floor():
+  # The emission-floor convention (omit candidates that would score 2
+  # or below rather than hedge with a low match_confidence) is the
+  # key signal that keeps Rachel's queue noise-free. It must appear
+  # BOTH in the preamble AND in levels 1 and 2 so the LLM can't miss
+  # it.
+  assert 'floor for emission is 3' in MAPPING_CONFIDENCE_RUBRIC
+  assert 'omit the candidate entirely' in MAPPING_CONFIDENCE_LEVELS[2]
+  assert 'Below the floor for emission' in MAPPING_CONFIDENCE_LEVELS[1]
+
+
+def test_mapping_confidence_levels_describe_semantic_overlap_not_citation():
+  # The generic CONFIDENCE_LEVEL_RUBRIC talks about "cited passages",
+  # which doesn't fit mapping (mapping scores semantic overlap, not
+  # citation support). The mapping-specific levels must describe
+  # overlap-shaped signals (named identifier, parameter overlap, scope
+  # overlap, keyword overlap).
+  for description in MAPPING_CONFIDENCE_LEVELS.values():
+    assert 'cited passages' not in description
 
 
 def test_recommended_actions_match_mapping_literal():

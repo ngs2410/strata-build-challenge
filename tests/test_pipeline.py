@@ -687,6 +687,23 @@ def test_extract_obligations_produces_one_entry_per_version():
   assert grounded[0].citation.end_offset == len(llm_extracted[0].citation.citing_span)
 
 
+def test_mapping_prompt_uses_mapping_confidence_rubric_not_generic():
+  # The generic CONFIDENCE_LEVEL_RUBRIC describes citation-support
+  # confidence; mapping needs semantic-overlap confidence with an
+  # emission floor at 3. The prompt must render the mapping-specific
+  # rubric, NOT the generic one.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  rubrics_section = user.split('## Rubrics')[1].split('## Pitfalls')[0]
+  assert 'Mapping confidence rubric' in rubrics_section
+  assert 'floor for emission is 3' in rubrics_section
+  # The generic rubric's giveaway phrase MUST NOT appear.
+  assert 'cited passages state the conclusion verbatim' not in rubrics_section
+
+
 def test_mapping_prompt_includes_action_and_routing_rubrics():
   # The mapping prompt must embed RECOMMENDED_ACTION_RUBRIC and
   # ROUTING_DESTINATION_GLOSSARY so the LLM has concrete decision rules

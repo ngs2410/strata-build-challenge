@@ -24,4 +24,4 @@ What broke and how I debugged it:
 (15) gpt-5.4-nano was clobbering white space which made citation verification less than optimal - we fixed it through whitespace normalization.
 (16) Claude implemented a 1:1 mapping between changes and all company assets, which is not realistic. I spotted this in the UI and redirectd Claude to refactor as a mapping between changes and each asset individually.
 (17) Claude included max_tokens in the ModelCaller cache key - which is wrong - I spotted it in a review of TDD.md and directed the change.
-(18) Many other tweaks and corrections.
+(18) Many other tweaks and corrections across > 120 commits.

@@ -185,12 +185,17 @@ Verdant Grid queue. The UI has two pages:
   [`AssetDecision`](TDD.md#26b-assetdecision) and emits an
   [`AuditEvent`](TDD.md#27-auditevent); bulk decisions share a
   `batch_id`.
+
+  ![Review Queue page: per-pair affected-items table with bulk toolbar and per-row decisions](images/queue_review.png)
+
 - `/audit?tenant_id=verdant_grid&environment=prod` — read-only
   chronological `AuditEvent` list (template:
   [`templates/audit.html`](templates/audit.html)); `batch_id` is
   surfaced per event so grouped bulk decisions are visible. Rollback
   is deferred to future work
   ([TDD §8.8](TDD.md#88-pure-fold-over-log-state--rollback)).
+
+  ![Audit Log page: newest-first timeline of AuditEvents from the pipeline run](images/audit_log.png)
 
 Flags: `--host`, `--port` (default 8000), `--reload` (dev-time
 auto-reload).

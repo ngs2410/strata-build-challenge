@@ -89,6 +89,32 @@ cp .env.example .env
 source env3.12/bin/activate
 ```
 
+### OpenAI API key for AI Fund reviewers
+
+For reviewer convenience, the submission email includes a
+disposable OpenAI API key you can paste into `.env`. The key has
+the following safeguards configured at the OpenAI dashboard:
+
+- **$5 hard budget cap** on the key. Any usage past this limit
+  fails with a billing error from OpenAI rather than silently
+  incurring cost. At gpt-5.4-nano pricing a full cold-cache
+  end-to-end pipeline run is ~$0.005, so the cap allows roughly
+  1000 full regens — well more than any realistic review session.
+- **Model allowlist** restricted to `gpt-5.4-nano` (the default
+  configured in [`config/default_domain_config.json`](config/default_domain_config.json))
+  and `gpt-5.4-mini` (available if a reviewer wants to swap the
+  `model_identifier` on one task to see higher-tier behaviour).
+  The key cannot be used against larger / more expensive models.
+- The key is specific to this submission review and will be
+  revoked after the review window closes.
+
+If you prefer, you can of course substitute your own OpenAI key —
+the pipeline doesn't care. The committed demo snapshot (see
+[Demo snapshot](#demo-snapshot-populated-ui-immediately-after-clone)
+section below) means the UI is populated without any pipeline
+run, so a key is only needed for regenerating the snapshot or
+re-running the eval harness.
+
 The `env3.12` directory name is what the [`Makefile`](Makefile)
 targets expect. If you prefer a different venv path, override the
 Python interpreter when running the commands below

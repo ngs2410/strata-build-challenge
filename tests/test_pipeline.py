@@ -568,6 +568,26 @@ def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side()
   )
 
 
+def test_obligation_extraction_prompt_teaches_process_as_subject_filter():
+  # Observed failure mode at gpt-5.4-nano: §(A)'s "The aggregator
+  # registration process shall not include a minimum size requirement"
+  # was extracted as an aggregator obligation because the LLM latched
+  # onto the surface mention of "aggregator" in the subject phrase. The
+  # process is actually administered by the RTO/ISO, so the sentence is
+  # a regulator-side cap on the RTO's rulemaking authority. Example 5
+  # teaches the "who administers the process" decision test.
+  version = _version('draft', 'nopr')
+  prompt = build_obligation_extraction_prompt(version)
+  _, user = prompt.render()
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  assert 'Example 5' in details_section
+  assert 'broker-dealer registration process' in details_section
+  assert 'ADMINISTERS' in details_section or 'administers' in details_section.lower()
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'SUBJECT is a PROCESS' in pitfalls_section
+  assert 'the aggregator registration process' in pitfalls_section
+
+
 def test_obligation_extraction_rubrics_contains_only_taxonomy_and_confidence():
   # Rubrics is just OBLIGATION_TAXONOMY_REFERENCE + CONFIDENCE_LEVEL_RUBRIC.
   # The old "Additional rules" subsection was duplicated across Steps and

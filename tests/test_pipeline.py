@@ -702,6 +702,49 @@ def test_mapping_rubrics_contains_only_confidence_action_and_routing():
   assert 'prevents id hallucination' in field_intents_section
 
 
+def test_mapping_prompt_proposes_per_item_action_and_route():
+  # The prompt must emit per-item proposed_action + proposed_route on
+  # each affected item. These replace the old mapping-level
+  # recommended_action + routing_destination fields.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  field_intents_section = user.split('## Field Intents')[1].split('## JSON Output Example')[0]
+  assert 'affected_items[*].proposed_action' in field_intents_section
+  assert 'affected_items[*].proposed_route' in field_intents_section
+  # The JSON output example lists per-item action/route and omits
+  # mapping-level recommended_action / routing_destination.
+  json_example_section = user.split('## JSON Output Example')[1].split('## Inputs')[0]
+  assert '"proposed_action"' in json_example_section
+  assert '"proposed_route"' in json_example_section
+  assert '"recommended_action"' not in json_example_section
+  assert '"routing_destination"' not in json_example_section
+
+
+def test_mapping_prompt_example_4_shows_diverse_asset_routing():
+  # Example 4 is the teaching case for per-item routing: one Change
+  # that genuinely touches three teams. Without this example at
+  # gpt-5.4-nano the LLM collapses all items to a single "primary
+  # team" route. The three distinct route strings must all appear
+  # inside Example 4.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  assert 'Example 4' in details_section
+  example_4 = details_section.split('Example 4')[1]
+  # Three distinct routes in the SAME example.
+  assert 'route="legal"' in example_4
+  assert 'route="market_ops"' in example_4
+  assert 'route="it_metering"' in example_4
+  # Explicit teaching that three teams on one Change is the point.
+  assert 'Three teams on one Change' in example_4
+
+
 def test_mapping_prompt_pitfalls_reject_hedge_verbs_in_match_rationale():
   # Observed failure mode at gpt-5.4-nano on §(A) tightened change: the
   # model emitted TWO borderline items at match_confidence=3 whose

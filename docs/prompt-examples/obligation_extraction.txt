@@ -1,0 +1,173 @@
+----------------------------------------------------------------------
+[model_caller] task=obligation_extraction model=openai://gpt-5.4-nano
+[model_caller] estimated_tokens=3178 inputs=(Passage text=1031c)
+[model_caller] prompt:
+
+--- system ---
+You are a regulatory obligation extractor. You identify the discrete obligations a regulatory text establishes, classify each by type, and cite each to its source passage. You produce structured JSON output.
+
+--- user ---
+## Task
+Extract every discrete obligation from the passage below.
+
+## Steps
+1. Read the passage. Identify every sentence or clause that establishes a discrete duty on the regulated entity.
+2. For each duty, decide its type per the obligation taxonomy (reporting / operational / procedural / financial).
+3. Draft a one-sentence summary. Copy the full obligation text verbatim from the passage as full_text.
+4. Extract citing_span: the SHORTEST verbatim substring from the cited passage that identifies the duty — not the full sentence, not the surrounding paragraph.
+5. Self-assess confidence per the rubric and name the level in confidence_rationale.
+
+## Details
+Example 1 — one sentence → one obligation (clean case):
+  Passage (hypothetical SEC rule): "A broker-dealer shall file Form X-17A-5 annually with the Commission by June 30."
+  Correct: ONE obligation.
+    obligation_type: reporting
+    summary: "A broker-dealer must file Form X-17A-5 annually with the Commission by June 30."
+    citing_span: "shall file Form X-17A-5 annually with the Commission by June 30"
+    confidence: 5 (the duty is stated verbatim).
+
+Example 2 — one sentence → two obligations (compound duty):
+  Passage (hypothetical HIPAA Minimum Necessary clause): "A covered entity shall limit uses and disclosures of protected health information to the minimum necessary for the intended purpose, and shall document a written policy identifying the individuals authorized to make minimum-necessary determinations."
+  Correct: TWO obligations.
+    Obligation A — operational: "shall limit uses and disclosures of protected health information to the minimum necessary for the intended purpose".
+    Obligation B — procedural: "shall document a written policy identifying the individuals authorized to make minimum-necessary determinations".
+  Rule of thumb: if removing one half of an "and shall ..." conjunction leaves the other half as a well-formed duty on its own, they are TWO obligations.
+
+Example 3 — shortest-span discipline:
+  Passage (hypothetical SEC rule, extended): "A broker-dealer shall file Form X-17A-5 annually with the Commission by June 30, which shall be executed by the chief executive officer and chief financial officer."
+  Correct citing_span: "shall file Form X-17A-5 annually with the Commission by June 30" — just the core filing duty.
+  NOT: the entire sentence including the "which shall be executed by ..." modifier. If the executive-signature clause were a distinct duty, it would be a separate obligation with its own span.
+
+Example 4 — regulator-side-duty filter (perspective rule):
+  Passage (hypothetical FinCEN rule): "FinCEN shall make the aggregated suspicious activity data available to law enforcement agencies within 72 hours of filing. A bank shall file a suspicious activity report with FinCEN when a transaction over $5,000 meets the identified reporting criteria."
+  Correct: ONE obligation — the bank's SAR-filing duty (reporting). FinCEN's data-sharing duty is a REGULATOR-side obligation and does NOT belong in the regulated entity's compliance set. The perspective rule in the Rubrics preamble applies to extraction as well as classification: Strata tracks the regulated entity's duties, not the regulator's.
+
+Example 5 — process-as-subject (regulator-side despite surface mention of the regulated entity):
+  Passage (hypothetical SEC rule): "A broker-dealer registration process shall not include a minimum net-capital requirement for applicants."
+  Correct: ZERO obligations. The grammatical subject is "a broker-dealer registration process" — a process the SEC/FINRA administers, NOT the broker-dealer. Surface mention of "broker-dealer" in the subject phrase does NOT make the sentence a broker-dealer obligation; from the broker-dealer's perspective this is a RIGHT (register without that cap), not a duty. Decision test: ask who ADMINISTERS the process named in the subject. If the regulator runs it, the sentence is a regulator-side constraint and must be omitted.
+
+Example 6 — content specification is NOT a separate obligation:
+  Passage (hypothetical FinCEN rule, two sentences): "A bank shall file a currency transaction report with FinCEN for each transaction over $10,000. The report shall include the account holder's name, taxpayer identification number, and transaction amount."
+  Correct: ONE obligation.
+    obligation_type: reporting
+    summary: "A bank must file a currency transaction report with FinCEN for each transaction over $10,000."
+    citing_span: "shall file a currency transaction report with FinCEN for each transaction over $10,000"
+  Rationale: the second sentence specifies the CONTENT of the CTR; it is a specification of sentence 1's filing duty, not a new duty with an independent compliance surface. A bank cannot comply with sentence 1 but violate sentence 2 in isolation — filing a CTR without the required content violates the SAME CTR-filing duty.
+
+## Rubrics
+Obligation taxonomy. Every ExtractedObligation.obligation_type must be one of the four values below. The description + example calibrate what each value covers.
+
+Perspective rule. Strata interprets every regulatory change from the REGULATED ENTITY's perspective — the aggregator, utility, hospital, broker, etc. whose compliance burden the system tracks. When a rule changes, the question is ALWAYS "does the regulated entity now have to do more, less, or the same?" — NOT "does the regulator have more or less authority?"
+
+A regulator-side relaxation that creates de facto new burden on the regulated entity is a TIGHTENING of the entity's obligation. A regulator-side expansion that lifts a burden the entity previously faced is a LOOSENING. If the direction is still ambiguous after applying this rule, drop confidence to 3 and name the ambiguity in confidence_rationale.
+
+- reporting: A submission the regulated entity must file with the regulator on a defined cadence or triggered event. Produces an artefact.
+  Example: Monthly Renewable Portfolio Standard compliance filing to the state PUC listing retired RECs by month.
+- operational: A continuous operating constraint the regulated entity must satisfy while running the regulated activity. Not a one-time submission.
+  Example: Maintain real-time telemetry from aggregated DER resources to the RTO while those resources are participating in wholesale markets.
+- procedural: A process the regulated entity must follow before, during, or after a triggered activity. Governs HOW an action is taken, not WHAT is reported.
+  Example: Register each DER with the RTO at least 60 days before its first market participation.
+- financial: An obligation that affects revenue, cost allocation, settlement, or market pricing — tariff provisions, charge formulas, settlement rules.
+  Example: Aggregator pays MISO a $0.05/MWh settlement fee on cleared aggregation offers.
+
+Confidence rubric (0-5 integer). Self-report your confidence in the conclusion AND set confidence_rationale naming which rubric level you picked and why. Over-confidence is a worse failure than under-confidence — when in doubt, drop one level.
+
+- 5: Unambiguous — the cited passages state the conclusion verbatim.
+- 4: Strongly supported — one short inferential step from the cited passages.
+- 3: Reasonable — the cited passages support the conclusion but a reviewer might legitimately disagree.
+- 2: Weak — surface signals point this way but the inference is thin.
+- 1: Speculative — judgement call with limited anchor in the cited text.
+- 0: Guess — no defensible anchor in the cited text; escalate.
+
+## Pitfalls
+- Do NOT extract a REGULATOR-side duty as an obligation of the regulated entity. "The Commission shall...", "FinCEN shall...", "The RTO/ISO shall accept bids from aggregators..." — these establish duties FOR THE REGULATOR, not for the regulated entity. Strata tracks the regulated entity's compliance set; regulator-side duties are entity RIGHTS, not entity obligations, and must be omitted. See Example 4 and the perspective rule in the Rubrics preamble.
+- Do NOT read a sentence whose SUBJECT is a PROCESS as an obligation of the regulated entity just because the process name surface-mentions the entity ("the aggregator registration process shall not include...", "the broker-dealer onboarding process shall..."). Ask who ADMINISTERS the process; if the regulator (RTO / ISO / SEC / FinCEN / the Commission) runs it, the sentence is a regulator-side constraint on the regulator's rulemaking — see Example 5.
+- Do NOT split one duty with multiple sub-elements into multiple obligations. "shall limit uses and disclosures of PHI to the minimum necessary" is ONE duty (apply the minimum-necessary standard to both uses and disclosures); the conjunction describes the scope of the duty, not two separate duties.
+- Do NOT extract a "The X shall include Y, Z" sentence as a separate obligation when it FOLLOWS an "A shall file / register / produce X" sentence. The content-specification sentence has no independent compliance surface — violating it is violating the SAME primary duty. Combine into ONE obligation whose citing_span is the primary verb clause. See Example 6.
+- Do NOT merge two independent duties into one. If two duties joined by "and shall ..." have separate compliance surfaces (one is a continuous constraint, the other produces an artefact), extract two obligations — see Example 2.
+- Do NOT include surrounding modifiers in citing_span. Pick the SHORTEST span that identifies the duty — see Example 3.
+- Do NOT emit confidence=5 on type-boundary cases. "shall maintain" could be operational (continuous constraint) or procedural (process); when the type is a judgment call, drop confidence to 3 or 4 and name the ambiguity in confidence_rationale.
+
+## Field Intents
+- obligation_type: one of reporting / operational / procedural / financial per the taxonomy above.
+- summary: one-sentence summary of the obligation.
+- full_text: verbatim obligation text copied from the passage.
+- citation.passage_index: 0-based index into the passage list (count "[0]" / "[1]" / ... prefixes).
+- citation.citing_span: SHORTEST verbatim substring from the cited passage that establishes this obligation. Character-for-character copy; do not paraphrase, summarise, or include surrounding context. Do NOT count characters or emit numeric offsets — grounding is done deterministically by Python after this call.
+- confidence: integer 0-5 per the confidence rubric above.
+- confidence_rationale: one sentence naming the rubric level you picked and why.
+- The harness owns extraction_id, tenant_id, environment, proceeding_id, and version_id — do NOT emit these fields.
+
+## JSON Output Example
+{
+  "extracted_obligations": [
+    {
+      "obligation_type": "<reporting|operational|procedural|financial>",
+      "summary": "<one-sentence summary of the obligation>",
+      "full_text": "<verbatim obligation text from the passage>",
+      "citation": {
+        "passage_index": <int 0-based index into the version's passage list>,
+        "citing_span": "<verbatim text span copied character-for-character from the cited passage>"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>"
+    }
+  ]
+}
+
+## Inputs
+Passage text: --- start of passage ---
+[0] (A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+aggregator registration process shall not include a minimum size
+requirement for the aggregated resources.
+
+[1] (B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator. The registration shall
+include the physical location of each distributed energy resource and
+its physical and operational characteristics.
+
+[2] (C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding.
+--- end of passage ---
+
+----------------------------------------------------------------------
+[model_caller] Proceed? (y/n): y
+I1014 11:10:19.788674 125595494605120 _client.py:1085] HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+{"task_name": "obligation_extraction", "model_name": "gpt-5.4-nano", "input_tokens": 2814, "output_tokens": 1156, "estimated_cost_usd": "0.000744", "event": "openai_backend.call", "level": "info", "timestamp": "2026-10-14T18:10:19.819736Z"}
+
+----------------------------------------------------------------------
+[model_caller] task=obligation_extraction response (ObligationExtractionResponse):
+{
+  "extracted_obligations": [
+    {
+      "obligation_type": "procedural",
+      "summary": "The aggregator must register each distributed energy resource in its aggregation with the RTO/ISO and ensure the registration includes each resource’s location and physical and operational characteristics.",
+      "full_text": "(B) The aggregator shall register each distributed energy resource that\nis included in the aggregation with the Regional Transmission\nOrganization or Independent System Operator. The registration shall\ninclude the physical location of each distributed energy resource and\nits physical and operational characteristics.",
+      "citation": {
+        "passage_index": 1,
+        "citing_span": "shall register each distributed energy resource"
+      },
+      "confidence": 5,
+      "confidence_rationale": "The passage unambiguously states a registration process duty on the aggregator, and the type is clear from the procedural nature of registering resources."
+    },
+    {
+      "obligation_type": "procedural",
+      "summary": "The aggregator must provide the RTO/ISO with information sufficient for the RTO/ISO to confirm that the aggregated resources can provide the services for which the aggregation is bidding.",
+      "full_text": "(C) The aggregator shall provide the Regional Transmission Organization\nor Independent System Operator with information sufficient to permit\nthe Regional Transmission Organization or Independent System Operator\nto confirm that the resources in the aggregation have the capability to\nprovide the services for which the aggregation is bidding.",
+      "citation": {
+        "passage_index": 2,
+        "citing_span": "shall provide the Regional Transmission Organization"
+      },
+      "confidence": 5,
+      "confidence_rationale": "The duty is stated directly and clearly as an information-provision requirement tied to enabling confirmation for bidding, making it properly procedural."
+    }
+  ]
+}
+----------------------------------------------------------------------
+

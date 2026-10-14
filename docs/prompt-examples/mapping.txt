@@ -1,0 +1,193 @@
+----------------------------------------------------------------------
+[model_caller] task=mapping model=openai://gpt-5.4-nano
+[model_caller] estimated_tokens=3928 inputs=(Change description=241c, Candidate obligations=885c, Candidate projects=261c, Candidate documents=465c)
+[model_caller] prompt:
+
+--- system ---
+You are a regulatory-change impact mapper. You take a Change detected between proceeding versions and determine which of a specific company's obligations, projects, and documents it affects. You produce structured JSON output.
+
+--- user ---
+## Task
+Map the Change below to its affected items. Recommend an action and route to the right internal team.
+
+## Steps
+1. Read the Change description. Identify what the change requires the regulated entity to START, STOP, or MODIFY.
+2. Scan each candidate list (obligations, projects, documents). For each candidate, ask: does the change substantively affect THIS item — not just topically mention it. "Topical overlap" is NOT the same as "affected".
+3. For each affected candidate, emit an AffectedItemByIndex with item_type, item_index, match_confidence, match_rationale, AND a per-item (proposed_action, proposed_route) pair. Decide the per-item action per the action rubric and the per-item route per the destination glossary — route is a property of the item's OWNERSHIP (which team owns this specific asset), not of the Change as a whole.
+4. Different items in the same mapping SHOULD route to different teams when the item types differ: a tariff-filing document routes to legal; a market-eligibility obligation routes to market_ops; a telemetry data feed routes to it_metering. Do NOT collapse per-item routes into one "primary team".
+5. Self-assess overall mapping confidence per the rubric; name the level in confidence_rationale.
+
+## Details
+Example 1 — narrow mapping (one obligation + one document, both route to legal):
+  Change (hypothetical SEC rule): "SEC amended Form X-17A-5 to require an additional capital-adequacy ratio in Schedule I."
+  Candidate obligations: [0] File Form X-17A-5 annually; [1] Maintain books and records; [2] Report OATS trade data.
+  Candidate documents: [0] Form X-17A-5 Template v2.1; [1] Books and Records Policy; [2] OATS Reporting Procedure.
+  Correct: TWO affected items.
+    - obligation [0]: match_confidence=5, proposed_action="amend", proposed_route="legal" (external filing).
+    - document [0]: match_confidence=5, proposed_action="amend", proposed_route="legal" (template needs the new column; same owner as the filing obligation).
+  Both items route to the same team because both ARE external regulatory artefacts owned by legal.
+
+Example 2 — empty mapping (no_op):
+  Change (hypothetical HHS rule): "HHS added a biennial minimum-necessary training requirement for all covered-entity workforce members."
+  Candidate obligations (utility tenant, no HIPAA relevance): [0] Register DER with RTO; [1] Maintain telemetry; [2] Monthly outage reporting.
+  Correct: ZERO affected items — the utility is not a HIPAA-covered entity and the training requirement does not touch anything in the candidate set. Emit affected_items=[], overall confidence=1-2, confidence_rationale naming the no-op basis. No per-item action/route to emit.
+
+Example 3 — fan-out mapping (four items, all route to legal because all are FinCEN filing artefacts):
+  Change (hypothetical FinCEN rule): "FinCEN tightened the CTR filing deadline from 15 to 10 calendar days and added a new wire-routing-path required field."
+  Candidate obligations: [0] File CTR for transactions over $10,000; [1] Monitor transaction activity continuously; [2] Train AML staff annually.
+  Candidate projects: [0] CTR Workflow Modernization; [1] AML Analyst Hiring FY26.
+  Candidate documents: [0] CTR Filing Procedure v4.2; [1] CTR Template; [2] AML Training Curriculum.
+  Correct: FOUR affected items.
+    - obligation [0]: match_confidence=5, action="amend", route="legal" (filing duty has a new deadline + field).
+    - project [0]: match_confidence=4, action="review", route="legal" (CTR Workflow Modernization owns the filing process).
+    - document [0]: match_confidence=5, action="amend", route="legal" (procedure must be updated to the new deadline + field).
+    - document [1]: match_confidence=5, action="amend", route="legal" (template needs the new field).
+  Obligation [1] (continuous monitoring) and obligation [2] (training) are topically adjacent but NOT substantively affected — omitted entirely (no match_confidence emitted).
+
+Example 4 — diverse-asset mapping (SAME Change touches THREE different teams):
+  Change (hypothetical NERC CIP rule): "NERC CIP tightened the bulk-electric-system cyber asset reporting cadence from annual to quarterly AND added a new continuous-telemetry data-element requirement for operator consoles."
+  Candidate obligations: [0] Quarterly BES-cyber-asset filing to NERC; [1] Maintain operator-console telemetry feed; [2] Participate in regional reliability drills.
+  Candidate projects: [0] BES Cyber Asset Program FY27.
+  Candidate documents: [0] BES Cyber Asset Compliance Plan; [1] Operator Console SCADA Configuration v4.
+  Correct: FIVE affected items that route to THREE different teams.
+    - obligation [0]: match_confidence=5, action="amend", route="legal" (external NERC filing cadence changed — legal owns external regulatory filings).
+    - obligation [1]: match_confidence=5, action="amend", route="it_metering" (new continuous-telemetry data element — it_metering owns telemetry cadence + data elements).
+    - project [0]: match_confidence=4, action="review", route="market_ops" (program-level — market_ops owns the operational program since reliability drills are a market participation workflow).
+    - document [0]: match_confidence=4, action="amend", route="legal" (compliance plan is a policy artefact — legal).
+    - document [1]: match_confidence=5, action="amend", route="it_metering" (SCADA configuration is a telemetry artefact — it_metering).
+  Three teams on one Change is the WHOLE POINT of per-item routing: the obligation touches an external filing (legal), the data feed touches operational telemetry (it_metering), and the program touches market participation (market_ops). Collapsing all five items to one "primary team" would hide this diversity from Rachel and misroute three of the five.
+
+## Rubrics
+Mapping confidence rubric (0-5 integer). Applies to both the overall mapping confidence AND to each affected_items[*].match_confidence. Match_confidence floor for emission is 3 — candidates that would score 2 or below are omitted entirely rather than hedged. Over-confidence is a worse failure than under-confidence.
+
+- 5: Unambiguous — the change explicitly names the item or an identifier the item carries (e.g., the change text mentions "Form X-17A-5" and the candidate is the Form X-17A-5 filing obligation).
+- 4: Strongly supported — the change targets a parameter / scope / content that the item directly covers, one short inferential step from the change text (e.g., change tightens a filing deadline, candidate obligation IS that filing).
+- 3: Reasonable — the item is substantively affected by the change but a reviewer might legitimately disagree about scope (e.g., change affects 'DER aggregation operations', candidate project is a specific DER aggregation program).
+- 2: Weak — topically adjacent but the match depends on an inference the change text does not clearly support. Below the floor for emission: omit the candidate entirely rather than emitting a match_confidence=2 hedge.
+- 1: Speculative — surface keyword overlap with no substantive effect. Below the floor for emission.
+- 0: Guess — no defensible overlap. Below the floor for emission; escalate if uncertain.
+
+Recommended-action rubric. Pick exactly one.
+
+- no_op: Nothing in the candidate set is substantively affected. The change is topically relevant but no obligation, project, or document in the company context requires any update. Choose when match_confidence on every candidate would be 2 or lower (and those matches are therefore omitted entirely).
+- review: At least one candidate is substantively affected AND a first-pass human read is needed to decide WHAT to update. Choose when the affected item is clear but the required edit is a judgment call (e.g., 'tariff needs an update but Rachel needs to decide which sections').
+- amend: At least one candidate is substantively affected AND there is a known concrete update (e.g., add a new required field to a form template, edit a specific tariff section, update an obligation parameter). Choose when the required edit is directly implied by the change text itself. When uncertain between review and amend, prefer review.
+
+Routing-destination glossary. Pick the single PRIMARY team accountable for the change (multi-destination routing is a known v2 extension — TDD §8.6).
+
+- market_ops: Market participation and operational workflows. Owns changes that affect wholesale market bidding, dispatch, settlement calendars, size-eligibility thresholds, participation registration, and day-ahead / real-time operational cadence. Does NOT own external regulatory filings or policy documents.
+- legal: External regulatory submissions and policy. Owns changes that affect tariff filings, compliance plans, external forms (SEC, FERC, state PUC), external training requirements, and policy documents. Does NOT own operational workflows or metering.
+- it_metering: Telemetry, metering, and operational data pipelines. Owns changes that affect data feeds, meter configuration, telemetry cadence, data-element specifications in operational submissions, and the underlying systems that produce them. Does NOT own commercial market operations or external filings.
+
+## Pitfalls
+- Do NOT map an item just because its name is topically adjacent to the change. "DER" appearing in both the change and the item title is a surface overlap, not a substantive effect. Ask: does the change require a concrete update to THIS item's compliance parameters / content / scope? If no, omit it. See the obligation [1] / [2] mismatches in Example 3.
+- Do NOT emit low-confidence match_confidence values to be safe. If match_confidence would be 2 or below, the item is not substantively affected — omit it entirely rather than including a hedge. Rachel's queue is noisier for every low-confidence match that ships; only emit matches you would defend.
+- Do NOT use HEDGE VERBS in match_rationale. If your rationale needs "may require", "should reflect", "likely impacts", "could affect", or any other hedge, the item is below the emission floor — omit it. A match worth emitting at match_confidence=3 states a SPECIFIC overlap in the form "the change requires X; the item specifies X" — not "the change may affect how X is handled." The hedge verb is the signal that you are reaching for topical adjacency rather than naming substantive effect.
+- Do NOT pick proposed_action="amend" on an item unless there is a known concrete edit implied for THAT item (new required field in this template, specific parameter edit on this obligation). "amend" means "we know what to change on this item"; "review" means "we need to look at this item first"; "no_op" means "this item is substantively affected but requires no edit." When uncertain between review and amend on a given item, prefer review.
+- Do NOT emit all affected items with the SAME proposed_route when the Change touches multiple teams' domains. A tariff edit that also tightens a market-eligibility threshold produces at least two routes: legal for the tariff document, market_ops for the eligibility obligation. Routing by item ownership is what makes per-pair curation work in Rachel's queue — collapsing everything to one route defeats the point.
+
+## Field Intents
+- affected_items[*].item_type: one of obligation / project / document.
+- affected_items[*].item_index: 0-based index into the matching candidate list in the Inputs section (obligation_candidates, project_candidates, or document_candidates per item_type). Count the "[0]" / "[1]" / ... prefixes. Must be a valid index into that list. Do NOT copy the item id string into this field — index-based selection prevents id hallucination (the harness resolves the index to the real id after).
+- affected_items[*].match_confidence: integer 0-5 per the confidence rubric below.
+- affected_items[*].match_rationale: one sentence naming the specific overlap between the change and this item.
+- affected_items[*].proposed_action: one of review / amend / no_op per the action rubric below — the action YOU recommend for THIS specific item (not for the Change as a whole).
+- affected_items[*].proposed_route: one of market_ops / legal / it_metering per the destination glossary below — the team that OWNS this specific item (based on item_type and the glossary's "owns" clauses). Different items in the SAME mapping can route to different teams.
+- confidence: integer 0-5 per the confidence rubric below (overall mapping confidence, not per-item).
+- confidence_rationale: one sentence naming the rubric level and why.
+- rationale: one paragraph summarising WHY this change maps to these items.
+- The harness owns mapping_id, tenant_id, environment, and change_id — do NOT emit these fields.
+
+## JSON Output Example
+{
+  "affected_items": [
+    {
+      "item_type": "<obligation|project|document>",
+      "item_index": <int 0-based index into the matching candidate list>,
+      "match_confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
+      "match_rationale": "<one sentence naming the specific overlap>",
+      "proposed_action": "<review|amend|no_op>",
+      "proposed_route": "<market_ops|legal|it_metering>"
+    }
+  ],
+  "confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
+  "confidence_rationale": "<which rubric level you picked and why>",
+  "rationale": "<one paragraph summarising WHY this change maps to these items>"
+}
+
+## Inputs
+Change description: change_type=tightened
+description=The rule allows the RTO/ISO to impose a minimum aggregated-resource size requirement (up to 100 kW), whereas the prior version prohibited any such minimum in the aggregator registration process.
+confidence=5
+Candidate obligations: [0] VG-OBL-DER-REG-01 (procedural, active): Register each DER in an aggregation with MISO before market participation.
+[1] VG-OBL-DER-TEL-01 (operational, active): Maintain telemetry feed for aggregated DER resources.
+[2] VG-OBL-DER-SIZE-01 (procedural, proposed): Honor RTO-set minimum aggregation size thresholds where applicable.
+[3] VG-OBL-DER-METER-01 (operational, active): Meter each DER's per-resource output within the aggregation.
+[4] VG-OBL-DER-SETTLEMENT-01 (financial, proposed): Settle DER aggregation market revenues per MISO's settlement calendar.
+[5] VG-OBL-DER-DISPATCH-NOTIF-01 (procedural, active): Notify DER aggregation participants ahead of dispatch instructions.
+[6] VG-OBL-OUTAGE-REPORT-01 (reporting, active): Monthly outage reporting to the state PUC.
+[7] VG-OBL-RPS-FILING-01 (reporting, active): Annual Renewable Portfolio Standard filing to the state PUC.
+Candidate projects: [0] VG-PRJ-DER-AGGR-PHASE1 (in_progress): MISO DER Aggregation Program — Phase 1
+[1] VG-PRJ-AMI-TELEMETRY-UPGRADE (planned): AMI Telemetry Upgrade for Behind-the-Meter Resources
+[2] VG-PRJ-DER-TRAINING-FY2027 (planned): DER Aggregation Workforce Training (FY27)
+Candidate documents: [0] VG-DOC-DER-OPS-PROC-v3.2 (procedure): DER Aggregation Operating Procedure v3.2
+[1] VG-DOC-TARIFF-FILING-2026Q4 (tariff_filing): Draft Tariff Filing — DER Aggregation Compliance (2026 Q4)
+[2] VG-DOC-MISO-DER-COMPLIANCE-PLAN (policy): Verdant Grid MISO DER Aggregation Compliance Plan v2.1
+[3] VG-DOC-DER-SETTLEMENT-PROC (procedure): DER Aggregation Settlement Procedure v1.0
+[4] VG-DOC-STAKEHOLDER-COMM-TEMPLATE (template): DER Participant Communication Template
+
+----------------------------------------------------------------------
+[model_caller] Proceed? (y/n): y
+I1014 11:11:19.216655 125595494605120 _client.py:1085] HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+{"task_name": "mapping", "model_name": "gpt-5.4-nano", "input_tokens": 3766, "output_tokens": 710, "estimated_cost_usd": "0.000661", "event": "openai_backend.call", "level": "info", "timestamp": "2026-10-14T18:11:19.256044Z"}
+
+----------------------------------------------------------------------
+[model_caller] task=mapping response (MappingResponse):
+{
+  "affected_items": [
+    {
+      "item_type": "obligation",
+      "item_index": 0,
+      "match_confidence": 4,
+      "match_rationale": "The rule changes the DER aggregation registration criteria by allowing an RTO-imposed minimum aggregated size, which affects the obligation to register each DER in an aggregation before market participation.",
+      "proposed_action": "review",
+      "proposed_route": "legal"
+    },
+    {
+      "item_type": "obligation",
+      "item_index": 2,
+      "match_confidence": 5,
+      "match_rationale": "The obligation explicitly requires honoring RTO-set minimum aggregation size thresholds, aligning directly with the change that now permits such minima up to 100 kW.",
+      "proposed_action": "amend",
+      "proposed_route": "market_ops"
+    },
+    {
+      "item_type": "project",
+      "item_index": 0,
+      "match_confidence": 3,
+      "match_rationale": "MISO DER Aggregation Program — Phase 1 governs implementation of aggregation registration requirements, which are impacted by the allowed minimum aggregated-resource size.",
+      "proposed_action": "review",
+      "proposed_route": "market_ops"
+    },
+    {
+      "item_type": "document",
+      "item_index": 0,
+      "match_confidence": 4,
+      "match_rationale": "The DER Aggregation Operating Procedure must be updated to reflect the new ability for the RTO/ISO to impose a minimum aggregated-resource size requirement during registration.",
+      "proposed_action": "amend",
+      "proposed_route": "legal"
+    },
+    {
+      "item_type": "document",
+      "item_index": 2,
+      "match_confidence": 4,
+      "match_rationale": "The MISO DER Aggregation Compliance Plan should incorporate the updated RTO/ISO rule allowing minimum aggregated-resource sizes in the registration process.",
+      "proposed_action": "amend",
+      "proposed_route": "legal"
+    }
+  ],
+  "confidence": 4,
+  "confidence_rationale": "High-confidence matches for obligations and documents that directly reference aggregation registration/minimum-size requirements, with a reasonable project-level tie to Phase 1 implementation.",
+  "rationale": "The change specifically alters the aggregator registration process by allowing the RTO/ISO to impose a minimum aggregated-resource size (up to 100 kW), which most directly impacts the obligation governing minimum aggregation thresholds and the related operating/compliance artefacts. It also has a clear but implementation-dependent effect on the Phase 1 DER Aggregation Program, while telemetry, metering, dispatch notifications, settlement, outage/RPS reporting, and participant communications are not substantively implicated by the minimum-size allowance."
+}
+----------------------------------------------------------------------

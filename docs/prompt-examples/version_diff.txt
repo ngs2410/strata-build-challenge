@@ -1,0 +1,238 @@
+----------------------------------------------------------------------
+[model_caller] task=version_diff model=openai://gpt-5.4-nano
+[model_caller] estimated_tokens=4178 inputs=(Prior version text=1043c, New version text=1302c)
+[model_caller] prompt:
+
+--- system ---
+You are a regulatory-change analyst. You compare the draft (NOPR) and final versions of a single subsection of a regulatory rule and return the material differences, classified by type and cited to the exact passage in each version. You produce structured JSON output.
+
+--- user ---
+## Task
+Compare the prior and new versions below and return a list of material changes.
+
+## Details
+Example 1 — "regulator removes a floor that protected the regulated entity" (regulated-entity perspective dominates):
+  Prior passage (hypothetical SEC rule): "A broker-dealer's trade confirmation period shall not be shorter than 2 business days."
+  New passage: "FINRA may require accelerated trade confirmation (down to 1 business day) for specific product categories identified by rule."
+  Correct: change_type="tightened". The regulator-side floor relaxed, but the broker-dealer (the regulated entity) now faces a potential tighter timeline on specific products — de facto new burden. prior_citation.citing_span = "shall not be shorter than 2 business days"; new_citation.citing_span = "may require accelerated trade confirmation (down to 1 business day) for specific product categories". confidence=4 (the direction is clear once perspective is applied; the perspective application is itself an inferential step).
+
+Example 2 — "new STANDALONE obligation grafted onto existing passage" (added, not tightened):
+  Prior (hypothetical HIPAA Minimum Necessary clause): "A covered entity shall limit uses and disclosures of protected health information to the minimum necessary for the intended purpose."
+  New: "A covered entity shall limit uses and disclosures of protected health information to the minimum necessary for the intended purpose, and shall document a written policy identifying the individuals authorized to make minimum-necessary determinations."
+  Correct: change_type="added", prior_citation=null. The policy-documentation requirement is a wholly-new STANDALONE action — the regulated entity now has to maintain and document a policy, an action independent of the minimum-necessary determination itself. The policy-documentation obligation could stand alone as its own clause; the fact that it lives in the same paragraph as the minimum-necessary standard is incidental. new_citation.citing_span = JUST "and shall document a written policy identifying the individuals authorized to make minimum-necessary determinations" — the shortest substring that supports the claim, NOT the full paragraph. confidence=5.
+
+Example 3 — "new parameter grafted onto existing obligation" (tightened, NOT added — contrast with Example 2):
+  Prior (hypothetical FinCEN SAR filing rule): "A bank shall file a suspicious activity report with FinCEN when a transaction over $5,000 meets any of the identified reporting criteria."
+  New: "A bank shall file a suspicious activity report with FinCEN within 30 calendar days of initial detection, including the identified transaction's wire routing path, when a transaction over $5,000 meets any of the identified reporting criteria."
+  Correct: change_type="tightened" (ONE change, not two). The SAR-filing obligation existed in the prior version. The new version tightens two of its PARAMETERS — timing (adds a 30-day deadline where there was none) AND required data elements (adds the wire routing path to the SAR payload). Both sub-modifications attach to the SAME underlying obligation (file SAR with FinCEN), so they are grouped into ONE tightened change with a description naming both sub-tightenings — NOT split into two separate changes. prior_citation.citing_span = "shall file a suspicious activity report with FinCEN when a transaction over $5,000"; new_citation.citing_span = "shall file a suspicious activity report with FinCEN within 30 calendar days of initial detection, including the identified transaction's wire routing path, when a transaction over $5,000". confidence=5 (both parameters demonstrably stricter in the new text).
+
+Contrast between Examples 2 and 3: in Example 2 the new clause describes a wholly-new STANDALONE action (document a policy) that could stand alone — "added". In Example 3 the new clauses describe PARAMETERS (timing, data elements) of an existing action (file SAR with FinCEN) that cannot stand alone — "tightened". The question to ask: does the new clause describe a NEW ACTION the entity must take (→ added), or does it MODIFY HOW an existing action must be taken (→ tightened/loosened)?
+
+## Rubrics
+Change-type rubric. Every detected Change.change_type must be one of the five values below.
+
+Perspective rule. Strata interprets every regulatory change from the REGULATED ENTITY's perspective — the aggregator, utility, hospital, broker, etc. whose compliance burden the system tracks. When a rule changes, the question is ALWAYS "does the regulated entity now have to do more, less, or the same?" — NOT "does the regulator have more or less authority?"
+
+A regulator-side relaxation that creates de facto new burden on the regulated entity is a TIGHTENING of the entity's obligation. A regulator-side expansion that lifts a burden the entity previously faced is a LOOSENING. If the direction is still ambiguous after applying this rule, drop confidence to 3 and name the ambiguity in confidence_rationale.
+
+- added: A wholly-NEW STANDALONE obligation present in the new version that did not exist in the prior version. The regulated entity now has to perform an ACTION they had no corresponding duty to perform before. An added obligation COULD stand alone even when it is written into the same paragraph as other obligations. Does NOT apply when a new clause modifies the parameters (timing, required data elements, thresholds, scope) of an EXISTING obligation — those are tightened or loosened. prior_citation must be null.
+- removed: An obligation or clause that existed in the prior version and is gone in the new version. The regulated entity no longer has to do something they previously had to do. new_citation must be null.
+- tightened: An existing obligation whose parameters got stricter FOR THE REGULATED ENTITY — common cases: adding a timing requirement (e.g. '... within 30 days'), adding a required data element to a reporting list (e.g. '... including the point of interconnection'), lowering a threshold, widening scope of who/what is covered, adding a precondition that must be satisfied. Also includes regulator-side changes (e.g. 'the RTO may now impose a minimum size') that create de facto new burden on the entity. If multiple parameters tighten the SAME underlying obligation, group them into ONE change (see Additional rules in the task prompt).
+- loosened: An existing obligation whose parameters got laxer FOR THE REGULATED ENTITY — relaxed timing, dropped required data elements, raised threshold, narrowed scope, removed precondition. Also includes regulator-side changes that lift a burden the entity previously faced. If multiple parameters loosen the SAME underlying obligation, group them into ONE change.
+- cosmetic: A re-wording, re-numbering, or re-formatting that preserves the obligation unchanged in substance. The regulated entity's compliance burden is identical before and after.
+
+Confidence rubric (0-5 integer). Self-report your confidence in the conclusion AND set confidence_rationale naming which rubric level you picked and why. Over-confidence is a worse failure than under-confidence — when in doubt, drop one level.
+
+- 5: Unambiguous — the cited passages state the conclusion verbatim.
+- 4: Strongly supported — one short inferential step from the cited passages.
+- 3: Reasonable — the cited passages support the conclusion but a reviewer might legitimately disagree.
+- 2: Weak — surface signals point this way but the inference is thin.
+- 1: Speculative — judgement call with limited anchor in the cited text.
+- 0: Guess — no defensible anchor in the cited text; escalate.
+
+Additional rules:
+- Classify each change as added / removed / tightened / loosened / cosmetic per the change-type rubric above. Apply the perspective rule inside the rubric — reason from the regulated entity's compliance surface, not the regulator's authority.
+- Decide added vs tightened by asking: does the new clause describe a NEW ACTION the entity must take (→ added, prior_citation=null), or does it MODIFY HOW an existing action must be taken (→ tightened / loosened)? Parameter modifications (timing, required data elements, thresholds, scope, preconditions) are NEVER "added" — they are always tightened/loosened of the underlying obligation. See Examples 2 and 3 in Details.
+- GROUP sub-modifications to the same underlying obligation into ONE change. If a new version adds a timing clause AND a required data element to the same registration/reporting/filing obligation, that is ONE tightened change with a description naming both sub-tightenings — NOT two separate changes. See Example 3 in Details.
+- Attach prior_citation and new_citation; set one to null when the change is added-only or removed-only.
+- Pure rewording that preserves meaning is cosmetic, not material.
+- passage_index is the 0-based index into the matching version's passage list (prior or new) as rendered in the Inputs section. Count the "[0]" / "[1]" / ... prefixes.
+- citing_span is the SHORTEST verbatim substring that supports the claim in description — character-for-character copy from the cited passage. Do NOT paraphrase, summarise, truncate mid-word, or include surrounding paragraph context. Do NOT count characters or emit numeric offsets — grounding is done deterministically by Python after this call.
+
+## Pitfalls
+- Do NOT classify a new PARAMETER (timing, data element, threshold) as "added". A parameter modifies an existing obligation — classify as tightened/loosened. "Added" is reserved for wholly-new STANDALONE obligations. See the Example-2-vs-Example-3 contrast in Details.
+- Do NOT split sub-modifications to the SAME obligation into multiple changes. If §(B) gains both a timing requirement AND a new required data element, both bound to the same registration obligation, that is ONE tightened change — not two added changes. See Example 3 in Details.
+- Do NOT set prior_citation on `change_type="added"`; it must be null. A new clause grafted onto an existing passage is still "added" when it is a wholly-new STANDALONE action — see Example 2 in Details.
+- Do NOT set new_citation on `change_type="removed"`; it must be null.
+- Do NOT emit confidence=5 when the "tightened vs loosened" direction depends on whose perspective. Strata's convention is the regulated-entity view (per the perspective rule in the change-type rubric); if that direction is STILL ambiguous after applying the rule, drop confidence to 3 and name the ambiguity.
+- Do NOT include the entire passage in citing_span. Pick the SHORTEST verbatim substring that supports the specific claim in description — see Example 2 in Details.
+- Do NOT paraphrase or summarise citing_span. If grounding's substring match returns -1 the citation is marked unverified and the item escalates to a human reviewer.
+
+## Field Intents
+- change_type: one of added / removed / tightened / loosened / cosmetic per the change-type rubric above.
+- description: one-sentence summary of the semantic shift between the prior and new versions, from the regulated entity's perspective.
+- prior_citation: an LlmCitation (passage_index into the PRIOR version's passage list + citing_span). null when change_type="added".
+- new_citation: an LlmCitation (passage_index into the NEW version's passage list + citing_span). null when change_type="removed".
+- {prior,new}_citation.passage_index: 0-based index into the matching version's passage list (count "[0]" / "[1]" / ... prefixes).
+- {prior,new}_citation.citing_span: the SHORTEST verbatim substring from the cited passage that supports the claim in description. Character-for-character copy; do not paraphrase, summarise, or include surrounding context.
+- confidence: integer 0-5 per the confidence rubric above.
+- confidence_rationale: one sentence naming the rubric level you picked and why.
+- The harness owns change_id, tenant_id, environment, proceeding_id, and detected_at — do NOT emit these fields.
+
+## JSON Output Example
+{
+  "changes": [
+    {
+      "change_type": "<added|removed|tightened|loosened|cosmetic>",
+      "description": "<one-sentence description of the semantic shift>",
+      "prior_citation": {
+        "passage_index": <int 0-based index into the prior version's passage list>,
+        "citing_span": "<verbatim text copied character-for-character from the cited prior passage>"
+      },
+      "new_citation": {
+        "passage_index": <int 0-based index into the new version's passage list>,
+        "citing_span": "<verbatim text copied character-for-character from the cited new passage>"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>"
+    }
+  ]
+}
+
+Also valid when change_type="added" — the whole prior_citation object is null:
+{
+  "changes": [
+    {
+      "change_type": "added",
+      "description": "<one-sentence description>",
+      "prior_citation": null,
+      "new_citation": {
+        "passage_index": <int 0-based index into the new version's passage list>,
+        "citing_span": "<verbatim text span from the cited new passage>"
+      },
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>"
+    }
+  ]
+}
+
+Also valid when change_type="removed" — the whole new_citation object is null:
+{
+  "changes": [
+    {
+      "change_type": "removed",
+      "description": "<one-sentence description>",
+      "prior_citation": {
+        "passage_index": <int 0-based index into the prior version's passage list>,
+        "citing_span": "<verbatim text span from the cited prior passage>"
+      },
+      "new_citation": null,
+      "confidence": <int 0-5 per CONFIDENCE_LEVEL_RUBRIC>,
+      "confidence_rationale": "<which rubric level you picked and why>"
+    }
+  ]
+}
+
+## Inputs
+Prior version text: --- start of prior version ---
+[0] (A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+aggregator registration process shall not include a minimum size
+requirement for the aggregated resources.
+
+[1] (B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator. The registration shall
+include the physical location of each distributed energy resource and
+its physical and operational characteristics.
+
+[2] (C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding.
+--- end of prior version ---
+New version text: --- start of new version ---
+[0] (A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+Regional Transmission Organization or Independent System Operator may
+establish a minimum size requirement for the aggregated resources that
+does not exceed 100 kW.
+
+[1] (B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator at least 60 days before the
+distributed energy resource participates in the aggregation. The
+registration shall include the physical location, the point of
+interconnection, and the physical and operational characteristics of
+each distributed energy resource.
+
+[2] (C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding, and shall
+provide a telemetry feed for aggregated resources rated at or above 100
+kW.
+--- end of new version ---
+
+----------------------------------------------------------------------
+[model_caller] Proceed? (y/n): y
+I1014 11:08:41.008866 125595494605120 _client.py:1085] HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+{"task_name": "version_diff", "model_name": "gpt-5.4-nano", "input_tokens": 3665, "output_tokens": 1720, "estimated_cost_usd": "0.001054", "event": "openai_backend.call", "level": "info", "timestamp": "2026-10-14T18:08:41.151139Z"}
+
+----------------------------------------------------------------------
+[model_caller] task=version_diff response (VersionDiffResponse):
+{
+  "changes": [
+    {
+      "change_type": "tightened",
+      "description": "The rule allows the RTO/ISO to impose a minimum aggregated-resource size requirement (up to 100 kW), whereas the prior version prohibited any such minimum in the aggregator registration process.",
+      "prior_citation": {
+        "passage_index": 0,
+        "citing_span": "The aggregator registration process shall not include a minimum size requirement for the aggregated resources."
+      },
+      "new_citation": {
+        "passage_index": 0,
+        "citing_span": "The Regional Transmission Organization or Independent System Operator may establish a minimum size requirement for the aggregated resources that does not exceed 100 kW."
+      },
+      "confidence": 5,
+      "confidence_rationale": "Unambiguous from the text: a prior prohibition on any minimum size requirement is replaced with permission to impose a minimum (bounded at 100 kW)."
+    },
+    {
+      "change_type": "tightened",
+      "description": "The aggregator must register each included distributed energy resource at least 60 days in advance and the registration must include the point of interconnection (in addition to physical location and physical/operational characteristics), tightening both timing and required registration details.",
+      "prior_citation": {
+        "passage_index": 1,
+        "citing_span": "The registration shall include the physical location of each distributed energy resource and its physical and operational characteristics."
+      },
+      "new_citation": {
+        "passage_index": 1,
+        "citing_span": "at least 60 days before the distributed energy resource participates in the aggregation. The registration shall include the physical location, the point of interconnection, and the physical and operational characteristics of each distributed energy resource."
+      },
+      "confidence": 5,
+      "confidence_rationale": "Both added parameters (60-day advance registration and inclusion of point of interconnection) are explicit in the new text, tightening the same registration obligation."
+    },
+    {
+      "change_type": "tightened",
+      "description": "The aggregator must provide a telemetry feed for aggregated resources rated at or above 100 kW, adding a new required information/data element on top of the prior information-sufficiency requirement.",
+      "prior_citation": {
+        "passage_index": 2,
+        "citing_span": "provide the Regional Transmission Organization or Independent System Operator with information sufficient to permit the Regional Transmission Organization or Independent System Operator to confirm"
+      },
+      "new_citation": {
+        "passage_index": 2,
+        "citing_span": "and shall provide a telemetry feed for aggregated resources rated at or above 100 kW."
+      },
+      "confidence": 5,
+      "confidence_rationale": "The new telemetry-feed requirement is stated directly and is not present in the prior version, making it a clear added burden (tightening) for the regulated entity."
+    }
+  ]
+}
+----------------------------------------------------------------------
+{"task_name": "version_diff", "model_identifier": "openai://gpt-5.4-nano", "tenant_id": "verdant_grid", "environment": "prod", "cache_hit": false, "event": "model_caller.call", "level": "info", "timestamp": "2026-10-14T18:08:41.152742Z"}
+
+----------------------------------------------------------------------
+

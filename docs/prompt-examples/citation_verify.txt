@@ -1,0 +1,183 @@
+----------------------------------------------------------------------
+[model_caller] task=citation_verify model=openai://gpt-5.4-nano
+[model_caller] estimated_tokens=2741 inputs=(Claim=4325c)
+[model_caller] prompt:
+
+--- system ---
+You are a citation verifier for a regulatory change-intelligence pipeline. For each proposed Change, you receive the change description and the exact text of the passage(s) it cites. You decide whether each cited passage substantively supports the described change. You produce structured JSON output.
+
+--- user ---
+## Task
+Verify every citation on each listed Change. Return one CitationVerificationItem per Change, keyed by the 0-based change_index (the "[0]", "[1]", … prefix on each change block in the Inputs section). The harness resolves the index back to the Change identity after.
+
+## Steps
+1. For each change block in the Inputs section, read the description.
+2. For each non-null citation side, read the citing span AND the full passage text that contains it.
+3. Decide verification per side:
+   - tightened/loosened prior_citation: span should show the pre-change state of the modified obligation (the parent obligation BEFORE the parameter change).
+   - tightened/loosened new_citation: span should show the new state INCLUDING the specific parameter named in the description.
+   - added new_citation: span should show the new standalone action.
+   - removed prior_citation: span should show the obligation that was removed.
+4. Verified=true requires the span to substantively support the specific claim in description — not merely sit in the right paragraph.
+5. For null citations (added has null prior; removed has null new): verified=null and rationale=null.
+6. For sides rendered as "GROUNDING_FAILED (do not verify this side — handled upstream)": emit verified=null and rationale=null — the grounding failure is already recorded upstream.
+
+## Details
+Example 1 — strong support (verified=true):
+  Description: "A new standalone policy-documentation requirement for minimum-necessary determinations was added."
+  new_citation.citing span: "and shall document a written policy identifying the individuals authorized to make minimum-necessary determinations"
+  Correct: new_citation_verified=true. The span explicitly describes the new standalone policy-documentation action. new_citation_rationale: "quotes 'shall document a written policy identifying the individuals authorized' — the exact new standalone obligation named in the description".
+
+Example 2 — right paragraph, wrong content (verified=false):
+  Description: "The capability-confirmation obligation is tightened by adding a required telemetry feed for aggregated resources rated at or above 100 kW."
+  new_citation.citing span: "the resources in the aggregation have the capability to provide the services for which the aggregation is bidding"
+  Correct: new_citation_verified=false. The span is from the same paragraph as the new telemetry requirement, but says NOTHING about telemetry or the 100 kW threshold — it is the pre-change capability language, not the post-change tightened state. new_citation_rationale: "cited span addresses capability confirmation but does not mention telemetry feed or the 100 kW threshold named in the description".
+
+Example 3 — parent-obligation span is correct for a tightened change's prior_citation (verified=true):
+  Description: "The SAR-filing obligation is tightened by adding a 30-day deadline and a required wire-routing-path data element."
+  prior_citation.citing span: "shall file a suspicious activity report with FinCEN when a transaction over $5,000 meets any of the identified reporting criteria"
+  Correct: prior_citation_verified=true. The span is the pre-change parent obligation (file a SAR with FinCEN) whose parameters the new version tightens. prior_citation_rationale: "span is the pre-change SAR-filing duty whose timing and data-element parameters the new version tightens".
+
+## Rubrics
+- prior_citation_verified=True only when the prior passage text substantively supports the described change (as the pre-change state).
+- new_citation_verified=True only when the new passage text substantively supports the described change (as the post-change state).
+- When a change has no prior_citation (e.g. change_type="added"), set prior_citation_verified and prior_citation_rationale to null.
+- Same for new_citation when change_type="removed".
+- Rationale should quote the specific supporting phrase from the passage — do NOT restate the description.
+
+## Pitfalls
+- Do NOT verify=true when the span is in the right paragraph but does not mention the specific parameter / action named in the description. "The passage is topically relevant" is NOT the same as "the span substantively supports the specific claim" — see Example 2.
+- Do NOT paraphrase the description in the rationale. The rationale MUST quote the specific supporting phrase from the passage/span; it is the auditor's receipt that the span actually says what the description claims.
+- Do NOT verify=false merely because the prior_citation span lacks the new parameter named in the description. A tightened/loosened prior_citation shows the pre-change parent obligation; it is CORRECT for it not to contain the tightening parameter — that lives in the new_citation. See Example 3.
+- When a citation side is rendered as "GROUNDING_FAILED (do not verify this side — handled upstream)", the structural grounding step upstream could not locate the citing span in the passage. That side is already recorded as unverified; emit verified=null and rationale=null for it. Do NOT attempt to verify from the description alone.
+
+## Field Intents
+- change_index: 0-based index into the input change list (the "[N]" prefix on each rendered change block). Must be a valid index into that list.
+- prior_citation_verified: true/false if the Change has a prior_citation; null if the Change has no prior_citation (e.g. change_type="added").
+- prior_citation_rationale: short quoted supporting phrase from the passage if verified=true; a one-sentence refutation naming what the span does NOT support if verified=false; null when prior_citation_verified is null.
+- new_citation_verified / new_citation_rationale: same pattern for the new_citation.
+
+## JSON Output Example
+{
+  "verifications": [
+    {
+      "change_index": <int 0-based index into the input change list>,
+      "prior_citation_verified": <true|false|null>,
+      "prior_citation_rationale": "<quote the specific supporting phrase, or null>",
+      "new_citation_verified": <true|false|null>,
+      "new_citation_rationale": "<quote the specific supporting phrase, or null>"
+    }
+  ]
+}
+
+## Inputs
+Claim: --- start of changes ---
+[0]
+change_type: tightened
+description: The rule allows the RTO/ISO to impose a minimum aggregated-resource size requirement (up to 100 kW), whereas the prior version prohibited any such minimum in the aggregator registration process.
+prior_citation:
+  passage text: "(A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+aggregator registration process shall not include a minimum size
+requirement for the aggregated resources."
+  citing span: "The
+aggregator registration process shall not include a minimum size
+requirement for the aggregated resources."
+new_citation:
+  passage text: "(A) Each Regional Transmission Organization and Independent System
+Operator shall accept bids from distributed energy resource aggregators
+to participate in its organized wholesale electric markets. The
+Regional Transmission Organization or Independent System Operator may
+establish a minimum size requirement for the aggregated resources that
+does not exceed 100 kW."
+  citing span: "The
+Regional Transmission Organization or Independent System Operator may
+establish a minimum size requirement for the aggregated resources that
+does not exceed 100 kW."
+
+[1]
+change_type: tightened
+description: The aggregator must register each included distributed energy resource at least 60 days in advance and the registration must include the point of interconnection (in addition to physical location and physical/operational characteristics), tightening both timing and required registration details.
+prior_citation:
+  passage text: "(B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator. The registration shall
+include the physical location of each distributed energy resource and
+its physical and operational characteristics."
+  citing span: "The registration shall
+include the physical location of each distributed energy resource and
+its physical and operational characteristics."
+new_citation:
+  passage text: "(B) The aggregator shall register each distributed energy resource that
+is included in the aggregation with the Regional Transmission
+Organization or Independent System Operator at least 60 days before the
+distributed energy resource participates in the aggregation. The
+registration shall include the physical location, the point of
+interconnection, and the physical and operational characteristics of
+each distributed energy resource."
+  citing span: "at least 60 days before the
+distributed energy resource participates in the aggregation. The
+registration shall include the physical location, the point of
+interconnection, and the physical and operational characteristics of
+each distributed energy resource."
+
+[2]
+change_type: tightened
+description: The aggregator must provide a telemetry feed for aggregated resources rated at or above 100 kW, adding a new required information/data element on top of the prior information-sufficiency requirement.
+prior_citation:
+  passage text: "(C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding."
+  citing span: "provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm"
+new_citation:
+  passage text: "(C) The aggregator shall provide the Regional Transmission Organization
+or Independent System Operator with information sufficient to permit
+the Regional Transmission Organization or Independent System Operator
+to confirm that the resources in the aggregation have the capability to
+provide the services for which the aggregation is bidding, and shall
+provide a telemetry feed for aggregated resources rated at or above 100
+kW."
+  citing span: "and shall
+provide a telemetry feed for aggregated resources rated at or above 100
+kW."
+--- end of changes ---
+
+----------------------------------------------------------------------
+[model_caller] Proceed? (y/n): y
+I1014 11:09:31.728693 125595494605120 _client.py:1085] HTTP Request: POST https://api.openai.com/v1/responses "HTTP/1.1 200 OK"
+{"task_name": "citation_verify", "model_name": "gpt-5.4-nano", "input_tokens": 2290, "output_tokens": 470, "estimated_cost_usd": "0.000417", "event": "openai_backend.call", "level": "info", "timestamp": "2026-10-14T18:09:31.771299Z"}
+
+----------------------------------------------------------------------
+[model_caller] task=citation_verify response (CitationVerificationResponse):
+{
+  "verifications": [
+    {
+      "change_index": 0,
+      "prior_citation_verified": true,
+      "prior_citation_rationale": "The aggregator registration process shall not include a minimum size requirement for the aggregated resources.",
+      "new_citation_verified": true,
+      "new_citation_rationale": "The Regional Transmission Organization or Independent System Operator may establish a minimum size requirement for the aggregated resources that does not exceed 100 kW."
+    },
+    {
+      "change_index": 1,
+      "prior_citation_verified": true,
+      "prior_citation_rationale": "The registration shall include the physical location of each distributed energy resource and its physical and operational characteristics.",
+      "new_citation_verified": true,
+      "new_citation_rationale": "at least 60 days before the distributed energy resource participates in the aggregation. The registration shall include the physical location, the point of interconnection, and the physical and operational characteristics of each distributed energy resource."
+    },
+    {
+      "change_index": 2,
+      "prior_citation_verified": true,
+      "prior_citation_rationale": "provide the Regional Transmission Organization or Independent System Operator with information sufficient to permit the Regional Transmission Organization or Independent System Operator to confirm",
+      "new_citation_verified": true,
+      "new_citation_rationale": "and shall provide a telemetry feed for aggregated resources rated at or above 100 kW."
+    }
+  ]
+}
+----------------------------------------------------------------------

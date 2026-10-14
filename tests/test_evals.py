@@ -187,8 +187,14 @@ def test_load_gold_parses_real_gold_file():
   assert case.case_id == 'order-2222-section-g-1-ix'
   assert case.input.docket_number == 'RM18-9'
   assert len(case.expected_changes) == 3
-  assert case.expected_changes[2].change_type == 'added'
-  assert case.expected_changes[2].prior_passage_position is None
+  # All three §(A)/§(B)/§(C) changes are tightened per the regulated-entity
+  # perspective rule (§A regulator-side relaxation = de facto new burden on
+  # entity → tightened) + the added-vs-tightened teaching for parameter
+  # grafts (§C telemetry is a new parameter on the capability-confirmation
+  # duty → tightened, not added).
+  for change in case.expected_changes:
+    assert change.change_type == 'tightened'
+    assert change.prior_passage_position is not None
 
 
 def test_render_text_report_includes_aggregate_and_per_case_lines():
@@ -529,9 +535,16 @@ def test_load_gold_parses_extended_fields():
   case = gold.cases[0]
   assert case.expected_verifications is not None
   assert len(case.expected_verifications) == 3
-  assert case.expected_verifications[2].prior_verified is None
+  # All three verifications have both prior and new citations verified
+  # (per the tightened-at-p3/p3 relabel of §C, there's a prior now).
+  for v in case.expected_verifications:
+    assert v.prior_verified is True
+    assert v.new_verified is True
   assert case.expected_extractions is not None
-  assert len(case.expected_extractions) == 7
+  # 5 extractions: §B + §C per each of 2 versions, plus the §C telemetry
+  # addendum in the final version. §A obligations dropped as regulator-side
+  # per the perspective rule teaching.
+  assert len(case.expected_extractions) == 5
   assert case.expected_mappings is not None
   assert len(case.expected_mappings) == 3
   assert case.company_context_tenant == 'verdant_grid'

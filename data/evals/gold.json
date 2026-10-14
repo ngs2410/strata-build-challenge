@@ -12,7 +12,7 @@
       },
       "expected_changes": [
         {
-          "change_type": "loosened",
+          "change_type": "tightened",
           "prior_passage_position": 1,
           "new_passage_position": 1,
           "description_keywords": ["minimum", "size", "100", "kW"]
@@ -24,15 +24,15 @@
           "description_keywords": ["60 days", "register"]
         },
         {
-          "change_type": "added",
-          "prior_passage_position": null,
+          "change_type": "tightened",
+          "prior_passage_position": 3,
           "new_passage_position": 3,
           "description_keywords": ["telemetry"]
         }
       ],
       "expected_verifications": [
         {
-          "change_match": ["loosened", 1, 1],
+          "change_match": ["tightened", 1, 1],
           "prior_verified": true,
           "new_verified": true
         },
@@ -42,18 +42,12 @@
           "new_verified": true
         },
         {
-          "change_match": ["added", null, 3],
-          "prior_verified": null,
+          "change_match": ["tightened", 3, 3],
+          "prior_verified": true,
           "new_verified": true
         }
       ],
       "expected_extractions": [
-        {
-          "version_id": "nopr-2019-11",
-          "obligation_type": "procedural",
-          "passage_position": 1,
-          "description_keywords": ["minimum", "size"]
-        },
         {
           "version_id": "nopr-2019-11",
           "obligation_type": "procedural",
@@ -65,12 +59,6 @@
           "obligation_type": "operational",
           "passage_position": 3,
           "description_keywords": ["capability", "services"]
-        },
-        {
-          "version_id": "final-2020-09",
-          "obligation_type": "procedural",
-          "passage_position": 1,
-          "description_keywords": ["100", "kW"]
         },
         {
           "version_id": "final-2020-09",
@@ -93,7 +81,7 @@
       ],
       "expected_mappings": [
         {
-          "change_match": ["loosened", 1, 1],
+          "change_match": ["tightened", 1, 1],
           "affected_items": [
             {
               "item_type": "obligation",
@@ -163,7 +151,7 @@
           ]
         },
         {
-          "change_match": ["added", null, 3],
+          "change_match": ["tightened", 3, 3],
           "affected_items": [
             {
               "item_type": "obligation",

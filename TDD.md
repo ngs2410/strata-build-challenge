@@ -791,9 +791,11 @@ _Source: [`src/citation/citation_verify.py`](https://github.com/ngs2410/strata-b
   actually supported" (§5.2).
 - **LLM-verifier in v1 vs. keyword overlap vs. embedding similarity.**
   Keyword overlap misses paraphrase; embedding similarity over-generates
-  (anything topically related looks "supporting"). LLM-as-NLI is correct
-  but expensive — exactly what Jev **Noul** is architected to replace at
-  scale.
+  (anything topically related looks "supporting"). LLM-as-NLI (natural
+  language inference — classifying a `(premise, hypothesis)` pair as
+  entailment / contradiction / neutral, with the cited passage as
+  premise and the claim as hypothesis) is correct but expensive —
+  exactly what Jev **Noul** is architected to replace at scale.
 - **Verification fails → escalation, not silent reject.** A failed
   verification is persisted with `verified=False`; the containing
   `Change` or `ExtractedObligation` is auto-routed to Rachel. Per

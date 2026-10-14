@@ -8,7 +8,7 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Review Queue</h1>
-    <p class="page-subtitle">Items awaiting Rachel's decision — approve, override, or escalate. Highest-priority items first.</p>
+    <p class="page-subtitle">Items awaiting Rachel's decision. Each change × asset pair is its own decision — approve, override, dismiss, or escalate per-pair; multi-select for bulk.</p>
   </div>
   <div class="page-header-aside">
     <span class="count">{{rows|length}}</span>
@@ -43,15 +43,6 @@
               <span class="meta-item"><span class="meta-label">confidence</span><span class="meta-value">{{row.mapping.confidence}}/5</span></span>
             {% endif %}
           </div>
-
-          {% if row.mapping and row.mapping.affected_items %}
-            <div class="affected">
-              <span class="affected-label">Affects</span>
-              {% for ai in row.mapping.affected_items %}
-                <span class="affected-item">{{ai.item_type}}: <code>{{ai.item_id}}</code><span class="conf"> {{ai.match_confidence}}/5</span><span class="conf"> → {{ai.proposed_action}} / {{ai.proposed_route}}</span></span>
-              {% endfor %}
-            </div>
-          {% endif %}
 
           {% if row.change and row.change.new_citation %}
             {% set p = passages_by_id.get(row.change.new_citation.passage_id) %}
@@ -100,15 +91,97 @@
             </details>
           {% endif %}
 
-          {# Per-pair action UI lands in commit 5 (queue UI rebuild). The old
-             mapping-level approve/override/escalate form was removed when
-             apply_action was replaced by apply_asset_decisions. #}
-          <div class="no-action">
-            Status: {{row.item.status}} — per-pair actions coming in UI rebuild.
-          </div>
+          {% if row.affected_rows %}
+            <form class="decide-form" method="post" action="/queue/{{row.item.review_item_id}}/decide">
+              <input type="hidden" name="tenant_id" value="{{tenant_id}}">
+              <input type="hidden" name="environment" value="{{environment}}">
+
+              <table class="affected-table">
+                <thead>
+                  <tr>
+                    <th class="col-check"><input type="checkbox" class="select-all" title="Select all"></th>
+                    <th class="col-type">Type</th>
+                    <th class="col-title">Item</th>
+                    <th class="col-match">Match</th>
+                    <th class="col-proposed">Proposed</th>
+                    <th class="col-current">Current</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for ar in row.affected_rows %}
+                    <tr class="affected-row">
+                      <td class="col-check">
+                        <input type="checkbox" name="affected_item_indexes" value="{{ar.index}}" class="row-select">
+                      </td>
+                      <td class="col-type">{{ar.affected_item.item_type}}</td>
+                      <td class="col-title">
+                        <code>{{ar.affected_item.item_id}}</code>
+                        {% if ar.title %}
+                          <div class="affected-title">{{ar.title}}</div>
+                        {% else %}
+                          <div class="affected-title muted">(no title in tenant inventory)</div>
+                        {% endif %}
+                      </td>
+                      <td class="col-match">{{ar.affected_item.match_confidence}}/5</td>
+                      <td class="col-proposed">
+                        <span class="proposed-action">{{ar.affected_item.proposed_action}}</span>
+                        <span class="proposed-sep">/</span>
+                        <span class="proposed-route">{{ar.affected_item.proposed_route}}</span>
+                      </td>
+                      <td class="col-current">
+                        {% if ar.decision %}
+                          <span class="status-{{ar.decision.decision}}">{{ar.decision.decision}}</span>
+                          <div class="affected-title muted">{{ar.decision.action}} / {{ar.decision.route}}</div>
+                        {% else %}
+                          <span class="status-pending">pending</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="decide-toolbar">
+                <label>Action
+                  <select name="action">
+                    <option value="amend">amend</option>
+                    <option value="review" selected>review</option>
+                    <option value="no_op">no_op</option>
+                  </select>
+                </label>
+                <label>Route
+                  <select name="route">
+                    <option value="market_ops">market_ops</option>
+                    <option value="legal" selected>legal</option>
+                    <option value="it_metering">it_metering</option>
+                  </select>
+                </label>
+                <input type="text" name="rationale" placeholder="Rationale for selected rows…" required>
+                <div class="decide-buttons">
+                  <button type="submit" class="btn btn-ghost" name="decision" value="escalated">Escalate</button>
+                  <button type="submit" class="btn btn-ghost" name="decision" value="dismissed">Dismiss</button>
+                  <button type="submit" class="btn btn-ghost" name="decision" value="overridden">Override</button>
+                  <button type="submit" class="btn btn-primary" name="decision" value="approved">Approve</button>
+                </div>
+              </div>
+            </form>
+          {% endif %}
         </div>
       </article>
     {% endfor %}
     </section>
+
+    <script>
+      // Select-all checkbox toggles all row checkboxes within its table.
+      // Vanilla JS, no framework (CLAUDE.md v1 rule).
+      document.querySelectorAll('.decide-form').forEach(function (form) {
+        var selectAll = form.querySelector('.select-all');
+        var rows = form.querySelectorAll('.row-select');
+        if (!selectAll) return;
+        selectAll.addEventListener('change', function () {
+          rows.forEach(function (r) { r.checked = selectAll.checked; });
+        });
+      });
+    </script>
   {% endif %}
 {% endblock %}

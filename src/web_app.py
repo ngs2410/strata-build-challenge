@@ -46,16 +46,21 @@ deployment on tenant-chosen cloud or on-premise is a post-wedge option
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from src.review_queue import apply_asset_decisions
 from src.stores import (
+  asset_decision_store,
   audit_log_store,
   change_store,
+  document_store,
   mapping_store,
+  obligation_store,
   proceeding_store,
+  project_store,
   review_item_store,
 )
 
@@ -78,11 +83,31 @@ def queue(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
   mappings = {m.mapping_id: m for m in _load_or_empty(mapping_store, tenant_id, environment)}
   changes = {c.change_id: c for c in _load_or_empty(change_store, tenant_id, environment)}
   passages_by_id = _build_passages_by_id(tenant_id, environment)
+  titles_by_id = _build_titles_by_id(tenant_id, environment)
+  decisions_by_pair = _build_decisions_by_pair(tenant_id, environment)
   rows = []
   for item in sorted(review_items, key=lambda i: -i.priority):
     mapping = mappings.get(item.mapping_id)
     change = changes.get(mapping.change_id) if mapping is not None else None
-    rows.append({'item': item, 'mapping': mapping, 'change': change})
+    affected_rows: list[dict] = []
+    if mapping is not None:
+      for index, ai in enumerate(mapping.affected_items):
+        affected_rows.append(
+          {
+            'index': index,
+            'affected_item': ai,
+            'title': titles_by_id.get((ai.item_type, ai.item_id)),
+            'decision': decisions_by_pair.get((item.review_item_id, index)),
+          }
+        )
+    rows.append(
+      {
+        'item': item,
+        'mapping': mapping,
+        'change': change,
+        'affected_rows': affected_rows,
+      }
+    )
   return templates.TemplateResponse(
     request,
     'queue.html',
@@ -101,6 +126,25 @@ def _build_passages_by_id(tenant_id: str, environment: str) -> dict:
   return {p.passage_id: p for v in versions for p in v.passages}
 
 
+def _build_titles_by_id(tenant_id: str, environment: str) -> dict:
+  obligations = _load_or_empty(obligation_store, tenant_id, environment)
+  projects = _load_or_empty(project_store, tenant_id, environment)
+  documents = _load_or_empty(document_store, tenant_id, environment)
+  titles: dict[tuple[str, str], str] = {}
+  for o in obligations:
+    titles[('obligation', o.obligation_id)] = o.summary
+  for p in projects:
+    titles[('project', p.project_id)] = p.name
+  for d in documents:
+    titles[('document', d.document_id)] = d.title
+  return titles
+
+
+def _build_decisions_by_pair(tenant_id: str, environment: str) -> dict:
+  decisions = _load_or_empty(asset_decision_store, tenant_id, environment)
+  return {(d.review_item_id, d.affected_item_index): d for d in decisions}
+
+
 @app.get('/audit', response_class=HTMLResponse)
 def audit(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
   events = _load_audit_or_empty(tenant_id, environment)
@@ -117,9 +161,39 @@ def audit(request: Request, tenant_id: str, environment: str) -> HTMLResponse:
   )
 
 
-# Per-pair /decide POST route lands in commit 5 alongside the queue UI
-# rebuild. The old /action POST route (one decision per mapping) was
-# deleted when `apply_action` was replaced by `apply_asset_decisions`.
+@app.post('/queue/{review_item_id}/decide')
+def post_decide(
+  review_item_id: str,
+  tenant_id: str = Form(...),
+  environment: str = Form(...),
+  decision: str = Form(...),
+  action: str = Form(...),
+  route: str = Form(...),
+  rationale: str = Form(...),
+  affected_item_indexes: list[int] = Form(...),
+  actor: str = Form('local_user'),
+) -> RedirectResponse:
+  inputs = [
+    {
+      'affected_item_index': index,
+      'decision': decision,
+      'action': action,
+      'route': route,
+      'rationale': rationale,
+    }
+    for index in affected_item_indexes
+  ]
+  apply_asset_decisions(
+    tenant_id=tenant_id,
+    environment=environment,
+    review_item_id=review_item_id,
+    inputs=inputs,
+    actor=actor,
+  )
+  return RedirectResponse(
+    url=f'/queue?tenant_id={tenant_id}&environment={environment}',
+    status_code=303,
+  )
 
 
 # The store facade raises FileNotFoundError when a tenant/env has no persisted

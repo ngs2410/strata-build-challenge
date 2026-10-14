@@ -501,3 +501,112 @@ details.rationale > div {
   font-style: italic;
   margin: 0 0 24px;
 }
+
+/* Per-pair decision table (queue.html) ------------------------------- */
+
+.decide-form {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.affected-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.affected-table thead th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg-code);
+  border-bottom: 1px solid var(--border-strong);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--fg-muted);
+}
+
+.affected-table tbody td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.affected-table .col-check { width: 32px; }
+.affected-table .col-type { width: 80px; color: var(--fg-secondary); }
+.affected-table .col-match { width: 56px; color: var(--fg-muted); }
+.affected-table .col-proposed { width: 180px; }
+.affected-table .col-current { width: 140px; }
+
+.affected-table code {
+  background: var(--bg-code);
+  padding: 1px 4px;
+  border-radius: var(--radius-badge);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.affected-title {
+  margin-top: 2px;
+  color: var(--fg-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.affected-title.muted { color: var(--fg-muted); font-style: italic; }
+
+.proposed-action, .proposed-route {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.proposed-sep { color: var(--fg-muted); margin: 0 4px; }
+
+.decide-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  background: var(--bg-citation);
+  border-radius: var(--radius-badge);
+  border: 1px solid var(--border);
+}
+
+.decide-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+
+.decide-toolbar select,
+.decide-toolbar input[type='text'] {
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-badge);
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--bg-card);
+  color: var(--fg-primary);
+}
+
+.decide-toolbar input[type='text'] {
+  flex: 1;
+  min-width: 200px;
+}
+
+.decide-buttons {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.status-dismissed { color: var(--fg-muted); font-weight: 600; }

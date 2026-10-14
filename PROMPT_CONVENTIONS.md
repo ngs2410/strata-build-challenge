@@ -1,6 +1,6 @@
 # Prompt Authoring Conventions
 
-Conventions for authoring LLM prompts in this codebase. Applies to all prompt builders across `src/ingest/`, `src/diff/`, `src/citation/`, `src/extraction/`, `src/mapping/`, and `src/workflow/`.
+Conventions for authoring LLM prompts in this codebase. Applies to all four prompt-building modules: [`src/version_diff.py`](src/version_diff.py), [`src/citation/citation_verify.py`](src/citation/citation_verify.py), [`src/obligation_extraction.py`](src/obligation_extraction.py), and [`src/mapping.py`](src/mapping.py). Each owns one LLM task (per CLAUDE.md "each LLM task gets its own module"); the shared `PromptSpec` + `CallSpec` dataclasses live in [`src/llm.py`](src/llm.py); shared rubric / taxonomy constants live in [`src/prompt_calibration.py`](src/prompt_calibration.py).
 
 Read this before writing or substantially editing any `PromptSpec`. The first draft of a new prompt is almost always wrong in at least one of the ways catalogued here.
 

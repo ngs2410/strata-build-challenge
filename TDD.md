@@ -139,6 +139,55 @@ dicts don't typecheck; SQLAlchemy's ORM shape would leak across our
 `Store[T]` facade. Both OpenAI structured outputs and the Jev adapter
 target Pydantic directly.
 
+**Entity graph (ASCII — the shape before any one section's detail).**
+
+```
+External authority (one per proceeding):
+    ProceedingVersion ──1:N─> Passage
+         │                       │
+         │ (version_diff emits   │ (every Citation ultimately points
+         │  Changes grounded     │  into a Passage of either prior
+         │  in Passage text)     │  or final version)
+         v                       v
+    Change ──1:0..1─> Citation (prior)   ──> Passage
+          ──1:0..1─> Citation (new)      ──> Passage
+      (grounding step .finds citing_span in passage.text →
+       Citation.{start_offset, end_offset, passage_id};
+       citation_verify flips Citation.verified)
+
+Company context (per tenant, seeded as JSON):
+    Obligation │ Project │ Document
+
+Mapping (Change × company context):
+    Change ──1:1─> Mapping ──1:N─> AffectedItem
+                                     │
+                                     ├─ item_type, item_id
+                                     ├─ match_confidence,
+                                     │  match_rationale
+                                     └─ proposed_action,
+                                        proposed_route  (per-item;
+                                        no mapping-level summary —
+                                        §8.6 closed in v1)
+
+Rachel's queue (one ReviewItem per Mapping):
+    Mapping ──1:1─> ReviewItem (status, priority)
+         │              │
+         │              └─ status = _fold_status over AssetDecisions
+         │                 (pending > escalated > overridden > approved)
+         │
+         └─ for each AffectedItem index, 0..1 AssetDecision
+            (decision ∈ {approved, overridden, dismissed, escalated},
+             action, route, rationale, decided_at, actor)
+            absence = pending; bulk ops share a batch_id
+
+Audit log (append-only JSONL — fold-over-log is the Strata invariant):
+    AuditEvent{kind, target_type, target_id,
+               prior_value_json, new_value_json,
+               rationale, batch_id, actor, occurred_at}
+    one per state transition; event_id has a monotonic counter
+    suffix to defeat microsecond collisions on bulk-apply.
+```
+
 ### 2.1 ProceedingVersion
 
 ```python
@@ -444,6 +493,57 @@ materialised views for folded state.
 ---
 
 ## 3. The Core Pipeline
+
+**End-to-end flow (ASCII).** `run_pipeline(tenant_id, environment, dry_run)` in
+`src/pipeline.py` orchestrates the six stages below; each emits a structlog
+`<stage>.start`/`.done` pair and (where applicable) appends an `AuditEvent`.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                     Strata pipeline — 6 stages                             │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  (1) INGEST         ─────> proceedings.json, obligations.json,             │
+│      ingest_tenant_fixture  projects.json, documents.json                  │
+│                                                                            │
+│  (2) DIFF ─ LLM     ─────> changes.json                                    │
+│      version_diff          (LlmChange → citation_grounding._resolve →      │
+│                             persisted Change with real Citation offsets)   │
+│                                                                            │
+│  (3) VERIFY ─ LLM   ─────> changes.json (Citation.verified ← true/false)   │
+│      citation_verify       (skipped if config.citation.verification_       │
+│                             required == false; apply_verification short-   │
+│                             circuits on grounding failure to prevent       │
+│                             laundering)                                    │
+│                                                                            │
+│  (4) EXTRACT ─ LLM×2 ────> extracted_obligations.json                      │
+│      obligation_           (one call per version; grounded via             │
+│      extraction            ground_obligations; failed grounding escalates) │
+│                                                                            │
+│  (5) MAP ─ LLM×N    ─────> mappings.json                                   │
+│      mapping               (one call per Change; emits per-item            │
+│                             AffectedItem with proposed_action +            │
+│                             proposed_route — §8.6 closed in v1)            │
+│                                                                            │
+│  (6) ENQUEUE        ─────> review_items.json                               │
+│      enqueue_mapping       (ReviewItem.status = pending | escalated per    │
+│                             EscalationConfig thresholds — citation         │
+│                             threshold is used when any citation is         │
+│                             unverified, mapping threshold otherwise)       │
+│                                                                            │
+├────────────────────────────────────────────────────────────────────────────┤
+│  Every artefact-producing stage: appends to audit_log.jsonl via log_event  │
+│  (append-only; fold-over-log is the Strata invariant).                     │
+│  LLM-calling stages (2,3,4,5): dispatch via ModelCaller → diskcache →      │
+│  OpenAI / Stub (see §4.1 diagram).                                         │
+│  v1 cold-cache cost: 7 LLM calls (1 diff + 1 verify + 2 extract +          │
+│  3 map) ≈ $0.005, ~15s wall-clock.                                         │
+│                                                                            │
+│  Rachel's loop — NOT a pipeline stage, triggered from the web UI:          │
+│  POST /queue/{id}/decide → apply_asset_decisions → N AssetDecisions +      │
+│  N AuditEvents sharing a batch_id (§3.7 Review & Audit).                   │
+└────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### 3.1 Ingest
 
@@ -886,11 +986,179 @@ _Source: [`src/review_queue.py`](https://github.com/ngs2410/strata-build-challen
 
 ## 4. Cross-Cutting Infrastructure
 
+### 4.0 Technology stack choices
+
+All v1 technology choices optimise for the same priority stack:
+**pragmatism** (shortest path to a working wedge) → **velocity**
+(standard patterns the AI harness already knows, so iteration cycles
+stay tight) → **simplicity** (fewer moving parts, fewer production-
+shape surprises) → **boringness** (the tool a staff engineer would
+default to, not the clever one) → **familiarity + integration
+readiness** (ecosystems with first-class Pydantic / OpenAI / FastAPI
+compatibility, so adapters are not bespoke). Nothing here is
+contrarian. The list below names each v1 choice with the one-line
+rationale under this rubric; alternative-and-why-not notes are
+inline on the choices where the panel is likely to ask.
+
+- **Language — Python 3.12.** Default stack for ML/LLM pipelines;
+  `Literal` + `match` + Pydantic v2 keep schema code dense.
+  Alternatives (Go, Rust, Node) force custom Pydantic-equivalents
+  and lose LLM-ecosystem integration readiness.
+
+- **Web framework — FastAPI + Jinja2.** FastAPI is the de-facto
+  Python async web standard with first-class Pydantic integration
+  (one model type across LLM dispatch, store, web form, template
+  context). Jinja2 is the boring/conventional Python template
+  choice; no JS framework at v1 (one `<script>` block in the
+  queue template for the select-all checkbox — CLAUDE.md v1 rule).
+  Alternatives (Flask + Marshmallow, Django + DRF) duplicate the
+  Pydantic layer we already have.
+
+- **Schema layer — Pydantic v2 with `extra='forbid'` on every
+  model.** One schema definition serves JSON load/save, LLM
+  structured output (via `client.responses.parse(text_format=...)`),
+  FastAPI request/response, and the eventual SQL migration (when
+  Postgres lands via a new `Store[T]` concrete). `extra='forbid'`
+  is the invariant that lets us rebuild-the-world on each run
+  (CLAUDE.md). Alternatives (dataclasses, attrs, msgspec) lose
+  the LLM-structured-output + FastAPI integration.
+
+- **JSON codec — orjson.** 2–5× faster than stdlib `json`,
+  strict UTF-8, no silent NaN serialisation. Boring Python
+  ecosystem default for data-pipeline workloads.
+
+- **LLM cache — diskcache.** Pure-Python, SQLite-backed, no
+  daemon, no infra. Fine at v1 scale (~7 calls per end-to-end
+  run × a few runs per day). Alternatives (Redis, memcached)
+  require a running daemon and bring zero marginal value until
+  N tenants share a cache ([§8.9](#89-cross-tenant-amortisation--multi-tier-mapping-cull)).
+  `.model_cache/` is gitignored.
+
+- **Structured logs — structlog → JSON to stderr.** Pydantic-
+  serialisable context, JSON output `grep`-able with `jq`, no
+  sinks or collectors at v1. OTel Collector is the production
+  shape ([§4.6](#46-telemetry)); structlog's JSON lines are the
+  OTel-attribute format already, so the migration is a sink swap,
+  not a code rewrite.
+
+- **Server runtime — uvicorn.** FastAPI's reference ASGI server;
+  `--reload` for dev-time template editing. Hypercorn / Daphne
+  offer the same ASGI surface with zero marginal benefit at v1.
+
+- **Tests — pytest.** Fixtures + `parametrize` + autouse are
+  first-class; the conftest `stub_all_task_configs` fixture
+  wires every LLM task to `StubBackend` so the whole suite is
+  network-free. `unittest` lacks fixture + parametrize
+  ergonomics; pytest is the Python ecosystem default.
+
+- **Lint / format — ruff.** Single tool for lint + format +
+  import-sort; ~100× faster than black + flake8 + isort combined.
+  Pre-ruff tooling was three overlapping tools with cross-config
+  friction.
+
+- **Secrets — python-dotenv.** Standard Python pattern for
+  `.env` → `os.environ` bootstrap. The load site is
+  `src/telemetry.py::configure_logging` (one of the first things
+  scripts call via `main_detect_changes.py`).
+
+- **CLI flags — absl-py flags.** Centralised flag registration;
+  cross-script flag reuse (shared defaults for `--tenant_id`,
+  `--environment`); strict type coercion. Click / typer were
+  considered; absl's `FLAGS` namespace is more honest about the
+  global-state cost. The CLAUDE.md compliance rule prohibits
+  tests importing from `scripts/main_*.py`, so the
+  flag-pollution risk is already contained.
+
+- **LLM provider — OpenAI responses API with structured
+  outputs.** Only mainstream provider with first-class Pydantic
+  structured output at the time of writing;
+  `client.responses.parse(model=..., text_format=ResponseModel)`
+  eliminates the downstream JSON parse + validate code we would
+  otherwise own. The dispatch is URL-prefix (`openai://`,
+  `jev://`, `stub://`) via `Backend.matches` (§4.1) — swapping
+  to Anthropic or Google Gemini is a new concrete + a config
+  change, no caller edits. Alternatives (OpenAI chat completions
+  with JSON mode, LangChain structured output, instructor-style
+  wrappers) all add parse-and-validate code we deleted when the
+  responses API shipped.
+
+Each per-section Decisions block (§2.x, §3.x, §4.x) covers the
+schema-shape or algorithmic choices that this list does not —
+Literal-vs-free-text, JsonStore batch-only semantics, index-based
+LLM output. Together they cover the technology-choice layer and
+the design-choice layer.
+
 ### 4.1 LLM Dispatch (ModelCaller)
 
 **Role.** Single chokepoint for all LLM and Jev calls. Owns: cache
 (diskcache with plaintext JSON keys), retries, response-model coercion,
 cost telemetry, backend selection.
+
+**Dispatch flow (ASCII).**
+
+```
+Call site (one of 4 LLM tasks: version_diff / citation_verify /
+           obligation_extraction / mapping)
+    │
+    │   PromptSpec.render() → (system_message, user_message)
+    │
+    v
+ModelCaller.call(task_name, params, response_type, call_spec,
+                 tenant_id, environment)
+    │
+    │ (a) Load TaskModelConfig for task from DomainConfig
+    │     - model_identifier: 'openai://gpt-5.4-nano' | 'stub://...'
+    │     - max_tokens, reasoning_effort, verbosity
+    │
+    │ (b) Compute diskcache key (plaintext JSON dict: model +
+    │     prompts + max_tokens + response_type.__name__)
+    │
+    │     ┌───────────────────┐
+    ├────>│  CACHE HIT:       │────> return response (short-circuit)
+    │     │  parsed Pydantic  │
+    │     └───────────────────┘
+    │
+    │ (c) CACHE MISS: dispatch by URL-prefix via Backend.matches
+    │     (facade — no inline startswith() ladder)
+    │
+    ├────> StubBackend (stub://)
+    │        └─> hand-constructed response from
+    │            PROMPT_REGISTRY[task_name].stub_module
+    │            (deterministic; used by tests + --stub_all regen)
+    │
+    ├────> OpenAIBackend (openai://)
+    │        │
+    │        v
+    │     client.responses.parse(
+    │        model=model_name,
+    │        input=[{role,content}, ...],
+    │        text_format=response_type,       # Pydantic model
+    │        reasoning={'effort': ...},
+    │        text={'verbosity': ...})
+    │        │
+    │        │  Retry on RateLimitError / InternalServerError /
+    │        │  APIConnectionError (exponential backoff, 3 attempts).
+    │        │  NEVER retry on auth / 4xx schema errors.
+    │        v
+    │        structured response → parsed Pydantic instance
+    │        │
+    │        │  Emit openai_backend.call telemetry:
+    │        │  {task_name, model_name, input_tokens, output_tokens,
+    │        │   estimated_cost_usd}
+    │        v
+    │
+    ├────> JevBackend (jev://)
+    │        └─> NotImplementedError (shell reserved for future
+    │            Jev integration; see JEV.md)
+    │
+    │ (d) Store parsed in diskcache (same plaintext JSON key)
+    │ (e) --confirm_llm: print prompt + token count + parsed response,
+    │     prompt y/n before dispatch; print parsed response after
+    │     dispatch (both via _prompt_user / _print_response)
+    │
+    v
+return response (Pydantic instance of response_type)
+```
 
 _Source: [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py) — `Backend` Protocol [L60](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L60), `ModelCaller` [L81](https://github.com/ngs2410/strata-build-challenge/blob/main/src/model_caller.py#L81). Backends: [`src/backends/openai_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/openai_backend.py) (retry logic + cost telemetry), [`src/backends/jev_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/jev_backend.py) (NotImplementedError shell), [`src/backends/stub_backend.py`](https://github.com/ngs2410/strata-build-challenge/blob/main/src/backends/stub_backend.py)._
 

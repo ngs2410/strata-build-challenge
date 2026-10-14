@@ -75,7 +75,7 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
    [`src/stores.py:L117-L127`](src/stores.py#L117-L127).
 
 2. **Diff**
-   ([`src/version_diff.py::detect_changes(prior, final)`](src/version_diff.py#L273)).
+   ([`src/version_diff.py::detect_changes(prior, final)`](src/version_diff.py#L391)).
    Builds one `PromptSpec` from `build_version_diff_prompt`,
    renders system + user messages, and calls `model_caller.call`
    with `task_name='version_diff'`. The LLM response parses into
@@ -85,7 +85,7 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
    LLM call per end-to-end run.
 
 3. **Ground citations**
-   ([`src/citation/citation_grounding.py::ground_citations_for_changes`](src/citation/citation_grounding.py#L51)).
+   ([`src/citation/citation_grounding.py::ground_citations_for_changes`](src/citation/citation_grounding.py#L80)).
    Deterministic Python runs `passage.text.find(citing_span)` for
    each `LlmCitation`. Successful match becomes a persisted
    `Citation` with real `start_offset` / `end_offset`,
@@ -100,7 +100,7 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
      passage".
 
 4. **Verify citations**
-   ([`src/citation/citation_verify.py::verify_citations`](src/citation/citation_verify.py#L156)).
+   ([`src/citation/citation_verify.py::verify_citations`](src/citation/citation_verify.py#L277)).
    Only runs if `DomainConfig.citation.verification_required`
    (default `True`). One LLM call per `Change` with the full
    grounded `Citation`'s passage text + offsets rendered into the
@@ -110,14 +110,14 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
    claim".
 
 5. **Extract obligations** (once per version). The LLM task
-   ([`src/obligation_extraction.py::extract_obligations`](src/obligation_extraction.py#L167))
+   ([`src/obligation_extraction.py::extract_obligations`](src/obligation_extraction.py#L305))
    returns `LlmExtractedObligation` with `LlmCitation`; same
    grounding step via
-   [`ground_obligations`](src/citation/citation_grounding.py#L77)
+   [`ground_obligations`](src/citation/citation_grounding.py#L106)
    converts to persisted `ExtractedObligation` with real offsets.
 
 6. **Map change → affected items**
-   ([`src/mapping.py::map_change`](src/mapping.py#L239)). One LLM
+   ([`src/mapping.py::map_change`](src/mapping.py#L432)). One LLM
    call per `Change`. The prompt sees the change description + the
    company context (obligations/projects/documents, capped at
    `config.mapping.candidate_set_size` — default 50; at v1
@@ -126,14 +126,14 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
    `MappingResponse.affected_items:
    tuple[AffectedItemByIndex, ...]` with `item_index: int` into
    the respective candidate list.
-   [`_resolve_affected_item`](src/mapping.py#L285) translates each
+   [`_resolve_affected_item`](src/mapping.py#L476) translates each
    index to the real `item_id` and returns the persisted `Mapping`.
 
 7. **Enqueue → review items**
    ([`src/review_queue.py::enqueue_mapping(mapping, change,
-   config)`](src/review_queue.py#L59)). Computes priority
+   config)`](src/review_queue.py#L85)). Computes priority
    (confidence × 1+affected_count). Two-tier escalation gate at
-   [`_escalation_threshold`](src/review_queue.py#L79): if any of
+   [`_escalation_threshold`](src/review_queue.py#L106): if any of
    the owning `Change`'s citations has `verified=False`, use
    `config.escalation.citation_threshold`; else
    `mapping_threshold`. If `mapping.confidence < threshold`,
@@ -141,7 +141,7 @@ sink. Then `run_pipeline('verdant_grid', 'prod', dry_run=False)`:
 
 Every stage's output is persisted through its typed Store
 singleton AND appended to `audit_log.jsonl` via
-[`log_event`](src/audit_log.py#L39). The pipeline ends with
+[`log_event`](src/audit_log.py#L50). The pipeline ends with
 `logger.info('pipeline.done', ...)`.
 
 A warm-cache run (every diskcache key present) is <1 second total —
@@ -162,7 +162,7 @@ Where to make the edit:
 → `citation.min_citation_span_chars: 20`.
 
 Where it takes effect:
-[`src/citation/citation_grounding.py::_resolve`](src/citation/citation_grounding.py#L107)
+[`src/citation/citation_grounding.py::_resolve`](src/citation/citation_grounding.py#L135)
 reads `config.citation.min_citation_span_chars` and compares
 against `len(citing_span)` — if short, sets
 `verified=False, verification_rationale="span width N below
@@ -251,11 +251,11 @@ seed + config + a replay of the pipeline — nothing non-reproducible.
 
 | Failure                              | Behaviour                                                                                   |
 |--------------------------------------|---------------------------------------------------------------------------------------------|
-| Unknown `passage_id` in LLM response | [`ValueError`](src/citation/citation_grounding.py#L107) — propagates; stops the run         |
+| Unknown `passage_id` in LLM response | [`ValueError`](src/citation/citation_grounding.py#L135) — propagates; stops the run         |
 | `citing_span` not found in passage   | `Citation.verified=False`, rationale "citing span not found" — downstream escalates         |
 | `len(citing_span) < min_citation_span_chars` | `Citation.verified=False`, rationale names the config knob — downstream escalates   |
 | LLM 429 / 5xx / connection error     | Exponential-backoff retry (3 attempts, 1s/2s/4s) in [`openai_backend`](src/backends/openai_backend.py); final failure re-raises |
-| LLM structured-output refusal        | `RuntimeError` from [`openai_backend`](src/backends/openai_backend.py#L62) naming the refusal |
+| LLM structured-output refusal        | `RuntimeError` from [`openai_backend`](src/backends/openai_backend.py#L71) naming the refusal |
 | LLM response truncated (`status='incomplete'`) | `RuntimeError` naming `max_tokens` + `incomplete_details`                        |
 | `mapping.confidence < threshold`     | `ReviewItem.status='escalated'` on construction — the system fails to a human, not a guess   |
 | Missing `.env` / `OPENAI_API_KEY`    | `openai.OpenAIError` from `OpenAI()` constructor on first LLM call — loud and clear          |
@@ -286,7 +286,7 @@ greppable, renameable, copyable.
 ### Where cost goes
 
 Pricing in
-[`openai_backend.py:L21-L26`](src/backends/openai_backend.py#L21-L26):
+[`openai_backend.py:L63-L68`](src/backends/openai_backend.py#L63-L68):
 `gpt-5.4-nano` at $0.00010 / 1k input tokens, $0.00040 / 1k output
 tokens. A typical cold-cache end-to-end run:
 - ~2000 input tokens × 20 calls = 40k input ≈ $0.004
@@ -558,7 +558,7 @@ shape:
   grounding is done deterministically by Python after this call."
 - **`src/obligation_extraction.py`** — same treatment:
   `LlmExtractedObligation` with `LlmCitation`.
-- **[`src/citation/citation_grounding.py`](src/citation/citation_grounding.py#L51)**
+- **[`src/citation/citation_grounding.py`](src/citation/citation_grounding.py#L80)**
   — complete rewrite. `ground_citations_for_changes` (for diff
   output) and `ground_obligations` (for extraction output) both
   call `_resolve(llm_citation, passages_by_id, min_span)` which

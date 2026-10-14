@@ -1150,7 +1150,7 @@ ModelCaller.call(task_name, params, response_type, call_spec,
     │     - max_tokens, reasoning_effort, verbosity
     │
     │ (b) Compute diskcache key (plaintext JSON dict: model +
-    │     prompts + max_tokens + response_type.__name__)
+    │     prompts + response_type.__name__)
     │
     │     ┌───────────────────┐
     ├────>│  CACHE HIT:       │────> return response (short-circuit)
@@ -1222,9 +1222,11 @@ _Source: [`src/model_caller.py`](https://github.com/ngs2410/strata-build-challen
   backend-agnostic — adding a provider is a new matcher, not an
   edit at every call site (per CLAUDE.md's facade-dispatch rule).
 - **Diskcache** key is a plaintext JSON dict:
-  `{model_identifier, max_tokens, reasoning_effort, verbosity,
-  response_type, input, inputs_dict}`. Cache dir `.model_cache/`,
-  in `.gitignore`.
+  `{model_identifier, reasoning_effort, verbosity, response_type,
+  input, inputs_dict}`. `max_tokens` is deliberately NOT in the key —
+  it's a ceiling, not an input that shapes the response (hitting it
+  truncates and errors, rather than producing a different valid
+  response). Cache dir `.model_cache/`, in `.gitignore`.
 - **Fan-out**: NOT shipped in v1. v1 cardinality is <20 everywhere,
   so every call site uses the sequential
   `for item in items: model_caller.call(...)` form. Fan-out helper

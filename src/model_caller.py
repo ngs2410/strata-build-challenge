@@ -21,8 +21,11 @@ asset"):
     to the key shape or hashing requires explicit user approval (hashed
     keys cannot be renamed in place and expensive calls would get repaid
     for cosmetic changes).
-  * Key composition: `{model_identifier, max_tokens, reasoning_effort,
-    verbosity, response_type.__name__, params['input'], params['inputs_dict']}`.
+  * Key composition: `{model_identifier, reasoning_effort, verbosity,
+    response_type.__name__, params['input'], params['inputs_dict']}`.
+    `max_tokens` is deliberately NOT in the key — it's a ceiling, not an
+    input that shapes the response (hitting it causes a truncation
+    error, not a different valid response).
   * `.model_cache/` on disk (in `.gitignore`), diskcache-backed, replayable
     with zero infra.
 
@@ -141,7 +144,6 @@ class ModelCaller:
   def _cache_key(self, task_config: TaskModelConfig, params: dict, response_type: type[T]) -> str:
     key_dict = {
       'model_identifier': task_config.model_identifier,
-      'max_tokens': task_config.max_tokens,
       'reasoning_effort': task_config.reasoning_effort,
       'verbosity': task_config.verbosity,
       'response_type': response_type.__name__,

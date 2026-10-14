@@ -41,8 +41,6 @@
             <span class="meta-item"><span class="meta-label">priority</span><span class="meta-value">{{row.item.priority}}</span></span>
             {% if row.mapping %}
               <span class="meta-item"><span class="meta-label">confidence</span><span class="meta-value">{{row.mapping.confidence}}/5</span></span>
-              <span class="meta-item"><span class="meta-label">route</span><span class="meta-value">{{row.mapping.routing_destination}}</span></span>
-              <span class="meta-item"><span class="meta-label">action</span><span class="meta-value">{{row.mapping.recommended_action}}</span></span>
             {% endif %}
           </div>
 
@@ -50,7 +48,7 @@
             <div class="affected">
               <span class="affected-label">Affects</span>
               {% for ai in row.mapping.affected_items %}
-                <span class="affected-item">{{ai.item_type}}: <code>{{ai.item_id}}</code><span class="conf"> {{ai.match_confidence}}/5</span></span>
+                <span class="affected-item">{{ai.item_type}}: <code>{{ai.item_id}}</code><span class="conf"> {{ai.match_confidence}}/5</span><span class="conf"> → {{ai.proposed_action}} / {{ai.proposed_route}}</span></span>
               {% endfor %}
             </div>
           {% endif %}

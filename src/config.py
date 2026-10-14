@@ -144,6 +144,11 @@ class AffectedItem(BaseModel):
   item_id: str
   match_confidence: int
   match_rationale: str
+  # Per-item AI proposals. The mapping LLM task emits a (proposed_action,
+  # proposed_route) pair per affected item — one Change can touch multiple
+  # teams with different action urgency per asset (TDD §8.6 closed in v1).
+  proposed_action: Literal['review', 'amend', 'no_op']
+  proposed_route: Literal['market_ops', 'legal', 'it_metering']
 
 
 class Mapping(BaseModel):
@@ -153,10 +158,9 @@ class Mapping(BaseModel):
   environment: str
   change_id: str
   affected_items: tuple[AffectedItem, ...]
-  recommended_action: Literal['review', 'amend', 'no_op']
-  # Single destination is a v1 scope choice. Real changes often touch multiple
-  # teams; expansion to tuple[Literal[...], ...] is open-question TDD §8.6.
-  routing_destination: Literal['market_ops', 'legal', 'it_metering']
+  # NO mapping-level recommended_action / routing_destination. Per-item
+  # proposals live on each AffectedItem (TDD §8.6 closed in v1 — a lossy
+  # mapping-level summary is strictly worse than per-item proposals).
   confidence: int
   confidence_rationale: str
   rationale: str
@@ -169,8 +173,36 @@ class ReviewItem(BaseModel):
   environment: str
   mapping_id: str
   priority: int
+  # Status is a WRITE-TIME aggregate over the ReviewItem's AssetDecisions
+  # (recomputed in review_queue.apply_asset_decisions). pending = at least
+  # one affected_item still has no AssetDecision; escalated / overridden /
+  # approved summarise the terminal set of per-pair decisions.
   status: Literal['pending', 'approved', 'overridden', 'escalated']
   created_at: datetime
+
+
+class AssetDecision(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  decision_id: str
+  tenant_id: str
+  environment: str
+  review_item_id: str
+  mapping_id: str
+  # Stable 0-based index into mapping.affected_items — the canonical key for
+  # a (change × asset) pair. item_type and item_id are denormalised from the
+  # resolved AffectedItem so the queue UI and audit payload don't need a
+  # cross-store join on every read.
+  affected_item_index: int
+  item_type: Literal['obligation', 'project', 'document']
+  item_id: str
+  decision: Literal['approved', 'overridden', 'dismissed', 'escalated']
+  # Rachel's chosen (action, route). Equal to the AffectedItem's proposed_*
+  # when decision == 'approved'; may differ when decision == 'overridden'.
+  action: Literal['review', 'amend', 'no_op']
+  route: Literal['market_ops', 'legal', 'it_metering']
+  rationale: str
+  decided_at: datetime
+  actor: str
 
 
 class AuditEvent(BaseModel):

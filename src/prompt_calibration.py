@@ -36,14 +36,18 @@ the same perspective rule):
     with an explicit emission floor at 3 (candidates that would score
     2 or below are omitted rather than hedged — keeps Rachel's queue
     noise-free).
-  * `RECOMMENDED_ACTION_RUBRIC` — the three `Mapping.recommended_action`
-    `Literal` values (no_op / review / amend) with the decision rule
-    for picking each. Shared so a future rerouter or triage prompt
-    doesn't re-define.
+  * `RECOMMENDED_ACTION_RUBRIC` — the three
+    `AffectedItem.proposed_action` `Literal` values
+    (no_op / review / amend) with the decision rule for picking each.
+    Applied PER AFFECTED ITEM — one Mapping with N items yields N
+    (action, route) proposals, not one. Shared so a future rerouter
+    or triage prompt doesn't re-define.
   * `ROUTING_DESTINATION_GLOSSARY` — the three
-    `Mapping.routing_destination` `Literal` values (market_ops / legal /
-    it_metering) with the ownership scope of each team. Prevents the
-    LLM from routing by keyword match alone.
+    `AffectedItem.proposed_route` `Literal` values
+    (market_ops / legal / it_metering) with the ownership scope of
+    each team. Applied PER AFFECTED ITEM — route is a property of the
+    item's ownership, not of the Change. Prevents the LLM from
+    routing by keyword match alone.
 
 The rubrics are built from source dicts (`OBLIGATION_TYPES`, `CHANGE_TYPES`,
 `CONFIDENCE_LEVELS`) so adding a value is a dict edit, not a prose rewrite.

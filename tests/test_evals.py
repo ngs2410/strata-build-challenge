@@ -4,6 +4,7 @@ from pathlib import Path
 from src.config import AffectedItem, Change, Citation, ExtractedObligation, Mapping
 from src.evals import (
   CaseResult,
+  ExpectedAffectedItem,
   ExpectedChange,
   ExpectedExtraction,
   ExpectedMapping,
@@ -348,35 +349,46 @@ def test_score_extractions_computes_keyword_coverage():
 # ---- score_mappings ----
 
 
+def _affected(
+  item_type: str,
+  item_id: str,
+  action: str = 'review',
+  route: str = 'legal',
+) -> AffectedItem:
+  return AffectedItem(
+    item_type=item_type,  # type: ignore[arg-type]
+    item_id=item_id,
+    match_confidence=4,
+    match_rationale='r',
+    proposed_action=action,  # type: ignore[arg-type]
+    proposed_route=route,  # type: ignore[arg-type]
+  )
+
+
+def _expected_affected(
+  item_type: str,
+  item_id: str,
+  action: str = 'review',
+  route: str = 'legal',
+) -> ExpectedAffectedItem:
+  return ExpectedAffectedItem(
+    item_type=item_type,  # type: ignore[arg-type]
+    item_id=item_id,
+    expected_action=action,  # type: ignore[arg-type]
+    expected_route=route,  # type: ignore[arg-type]
+  )
+
+
 def _mapping(
   change_id: str,
-  obligation_ids: tuple[str, ...] = (),
-  project_ids: tuple[str, ...] = (),
-  document_ids: tuple[str, ...] = (),
-  action: str = 'review',
-  destination: str = 'legal',
+  affected: tuple[AffectedItem, ...] = (),
 ) -> Mapping:
-  items = []
-  for oid in obligation_ids:
-    items.append(
-      AffectedItem(item_type='obligation', item_id=oid, match_confidence=4, match_rationale='r')
-    )
-  for pid in project_ids:
-    items.append(
-      AffectedItem(item_type='project', item_id=pid, match_confidence=4, match_rationale='r')
-    )
-  for did in document_ids:
-    items.append(
-      AffectedItem(item_type='document', item_id=did, match_confidence=4, match_rationale='r')
-    )
   return Mapping(
     mapping_id=f'{change_id}:mapping',
     tenant_id='t',
     environment='e',
     change_id=change_id,
-    affected_items=tuple(items),
-    recommended_action=action,
-    routing_destination=destination,
+    affected_items=affected,
     confidence=4,
     confidence_rationale='r',
     rationale='r',
@@ -385,22 +397,23 @@ def _mapping(
 
 def test_score_mappings_counts_affected_items_tp_fp_fn():
   change = _change('c-1', 'loosened', 1, 1)
+  # Predicted: O1 + O2 obligations.
+  # Expected: O1 obligation + P1 project.
+  # Expect: tp=1 (O1), fp=1 (O2 unexpected), fn=1 (P1 missing).
   mapping = _mapping(
     'c-1',
-    obligation_ids=('O1', 'O2'),  # expected O1 only → O2 is FP
-    project_ids=(),
-    document_ids=(),
-    action='review',
-    destination='legal',
+    affected=(
+      _affected('obligation', 'O1', action='review', route='legal'),
+      _affected('obligation', 'O2', action='review', route='legal'),
+    ),
   )
   expected = (
     ExpectedMapping(
       change_match=('loosened', 1, 1),
-      affected_obligation_ids=('O1',),
-      affected_project_ids=('P1',),  # missing → FN
-      affected_document_ids=(),
-      recommended_action='review',
-      routing_destination='legal',
+      affected_items=(
+        _expected_affected('obligation', 'O1', action='review', route='legal'),
+        _expected_affected('project', 'P1', action='review', route='legal'),
+      ),
     ),
   )
   result = _empty_result()
@@ -410,36 +423,46 @@ def test_score_mappings_counts_affected_items_tp_fp_fn():
   assert result.mapping_item_fn == 1  # P1
 
 
-def test_score_mappings_tracks_action_and_route_accuracy():
+def test_score_mappings_tracks_per_item_action_and_route_accuracy():
+  # Three affected items, each with its own (action, route). Predicted
+  # matches on one, mismatches action on another, mismatches route on
+  # the third.
   change = _change('c-1', 'loosened', 1, 1)
-  mapping = _mapping('c-1', obligation_ids=('O1',), action='amend', destination='legal')
+  mapping = _mapping(
+    'c-1',
+    affected=(
+      _affected('obligation', 'O1', action='amend', route='market_ops'),
+      _affected('document', 'D1', action='amend', route='legal'),
+      _affected('project', 'P1', action='review', route='market_ops'),
+    ),
+  )
   expected = (
     ExpectedMapping(
       change_match=('loosened', 1, 1),
-      affected_obligation_ids=('O1',),
-      affected_project_ids=(),
-      affected_document_ids=(),
-      recommended_action='review',  # mismatch
-      routing_destination='legal',  # match
+      affected_items=(
+        _expected_affected('obligation', 'O1', action='amend', route='market_ops'),  # both match
+        _expected_affected('document', 'D1', action='review', route='legal'),  # action mismatch
+        _expected_affected('project', 'P1', action='review', route='legal'),  # route mismatch
+      ),
     ),
   )
   result = _empty_result()
   score_mappings(result, expected, [change], [mapping])
-  assert result.mapping_action_correct == 0
-  assert result.mapping_action_total == 1
-  assert result.mapping_route_correct == 1
-  assert result.mapping_route_total == 1
+  assert result.mapping_action_total == 3
+  assert result.mapping_action_correct == 2  # O1 + P1
+  assert result.mapping_route_total == 3
+  assert result.mapping_route_correct == 2  # O1 + D1
 
 
 def test_score_mappings_handles_missing_predicted_change():
   expected = (
     ExpectedMapping(
       change_match=('tightened', 2, 2),
-      affected_obligation_ids=('O1', 'O2'),
-      affected_project_ids=('P1',),
-      affected_document_ids=(),
-      recommended_action='amend',
-      routing_destination='market_ops',
+      affected_items=(
+        _expected_affected('obligation', 'O1', action='amend', route='market_ops'),
+        _expected_affected('obligation', 'O2', action='amend', route='market_ops'),
+        _expected_affected('project', 'P1', action='review', route='market_ops'),
+      ),
     ),
   )
   result = _empty_result()
@@ -480,15 +503,18 @@ def test_aggregate_includes_per_stage_sections():
     (
       ExpectedMapping(
         change_match=('loosened', 1, 1),
-        affected_obligation_ids=('O1',),
-        affected_project_ids=(),
-        affected_document_ids=(),
-        recommended_action='review',
-        routing_destination='legal',
+        affected_items=(
+          _expected_affected('obligation', 'O1', action='review', route='legal'),
+        ),
       ),
     ),
     [change],
-    [_mapping('c-1', obligation_ids=('O1',), action='review', destination='legal')],
+    [
+      _mapping(
+        'c-1',
+        affected=(_affected('obligation', 'O1', action='review', route='legal'),),
+      )
+    ],
   )
   agg = aggregate([result])
   assert agg['change_detection']['f1'] == 1.0

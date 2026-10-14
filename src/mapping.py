@@ -1,12 +1,13 @@
-'''`mapping` LLM task — one `Change` → the company items it affects + action + route.
+'''`mapping` LLM task — one `Change` → the company items it affects.
 
 Pipeline position: `map_change(change, obligations, projects, documents)`
 is called once per Change by `pipeline.run_pipeline`. One LLM call per
 change (v1 scale: ~5 changes per end-to-end run). Returns a fully-formed
-`Mapping` with: `affected_items`, `recommended_action`
-(review/amend/no_op), `routing_destination`
-(market_ops/legal/it_metering), `confidence`, and the free-text
-`rationale`.
+`Mapping` with: `affected_items` (each carrying its own
+`proposed_action` + `proposed_route`), `confidence`, and the free-text
+`rationale`. There is NO mapping-level `recommended_action` or
+`routing_destination` — per-item proposals replace the lossy summary
+(TDD §8.6 closed in v1).
 
 Index-based item selection (hallucination guard):
 The LLM is asked for `AffectedItemByIndex(item_type, item_index, ...)` —
@@ -23,15 +24,19 @@ the company context exceeds ~200 items the mapping stage splits into the
 three paths in TDD §3.6; the facade stays `map_change(change, obligations,
 projects, documents)`.
 
-Routing destination is intentionally single-valued in v1
-(`Literal['market_ops', 'legal', 'it_metering']`). Multi-destination
-routing is open-question TDD §8.6 — the LLM picks ONE primary team. The
-prompt says this explicitly.
+Per-item routing: each AffectedItem carries its own
+`proposed_action: Literal['review', 'amend', 'no_op']` and
+`proposed_route: Literal['market_ops', 'legal', 'it_metering']`. One
+Change touching N diverse assets produces N (action, route) proposals,
+not one. Rachel's per-pair AssetDecision then approves / overrides /
+dismisses / escalates each pair independently (TDD §3.7).
 
 `stub_mapping_response` applies three naive filters (source_authority
 substring match, obligation→project transitive hit, DER-in-title match)
-plus a simple change_type→routing/action lookup. Enough for StubBackend
-tests to exercise the index-resolution path without an API call.
+and emits per-item action + route by item_type: obligations → amend /
+market_ops; documents → review / legal; projects → review / market_ops.
+Enough for StubBackend tests to exercise the index-resolution path
+without an API call AND to produce multi-team per-pair outputs.
 '''
 
 from typing import Literal
@@ -63,14 +68,14 @@ MAPPING_JSON_EXAMPLE = """{
       "item_type": "<obligation|project|document>",
       "item_index": <int 0-based index into the matching candidate list>,
       "match_confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
-      "match_rationale": "<one sentence naming the specific overlap>"
+      "match_rationale": "<one sentence naming the specific overlap>",
+      "proposed_action": "<review|amend|no_op>",
+      "proposed_route": "<market_ops|legal|it_metering>"
     }
   ],
-  "recommended_action": "<review|amend|no_op>",
-  "routing_destination": "<market_ops|legal|it_metering>",
   "confidence": <int 0-5 per MAPPING_CONFIDENCE_RUBRIC>,
   "confidence_rationale": "<which rubric level you picked and why>",
-  "rationale": "<one paragraph summarising WHY this change maps to these items and this team>"
+  "rationale": "<one paragraph summarising WHY this change maps to these items>"
 }"""
 
 STUB_RATIONALE = (
@@ -86,13 +91,13 @@ class AffectedItemByIndex(BaseModel):
   item_index: int
   match_confidence: int
   match_rationale: str
+  proposed_action: Literal['review', 'amend', 'no_op']
+  proposed_route: Literal['market_ops', 'legal', 'it_metering']
 
 
 class MappingResponse(BaseModel):
   model_config = ConfigDict(extra='forbid')
   affected_items: tuple[AffectedItemByIndex, ...]
-  recommended_action: Literal['review', 'amend', 'no_op']
-  routing_destination: Literal['market_ops', 'legal', 'it_metering']
   confidence: int
   confidence_rationale: str
   rationale: str
@@ -101,20 +106,22 @@ class MappingResponse(BaseModel):
 MAPPING_SPEC = CallSpec(
   purpose=(
     "For a given Change, identify which of Verdant's obligations, projects, "
-    'and documents it affects; recommend a per-item action; route the '
-    'overall change to its PRIMARY internal destination (one of three in v1 '
-    '— multi-destination routing is a known v2 extension; see TDD §8.6).'
+    'and documents it affects; propose a per-item (action, route) for each '
+    'affected item. One Change touching N diverse assets yields N '
+    '(action, route) proposals — Rachel curates per-pair in the review '
+    'queue (TDD §3.7).'
   ),
   acceptance_criteria=(
     'Mapping has at least one AffectedItem OR a rationale explaining why no '
-    'obligation is affected; routing_destination is one of market_ops / '
-    'legal / it_metering; recommended_action matches change_type semantics.'
+    'obligation is affected; every emitted AffectedItem carries a '
+    'proposed_action (review / amend / no_op) and a proposed_route '
+    '(market_ops / legal / it_metering) that match the item\'s semantics.'
   ),
   failure_modes=(
     '(a) Over-mapping — flagging unrelated obligations as affected. '
-    '(b) Primary-destination miscall — picking the wrong primary team among '
-    'market_ops / legal / it_metering when the change clearly belongs to a '
-    'different one. '
+    '(b) Per-item routing miscall — assigning a route that does not match '
+    'what the item type ACTUALLY is (e.g., routing a tariff filing to '
+    'market_ops instead of legal). '
     '(c) ID hallucination — picking an obligation_id not in the candidate list.'
   ),
 )
@@ -163,18 +170,19 @@ def build_mapping_prompt(
       'item — not just topically mention it. "Topical overlap" is NOT '
       'the same as "affected".\n'
       '3. For each affected candidate, emit an AffectedItemByIndex with '
-      'the item_type, item_index, match_confidence, and a '
-      'match_rationale naming the specific overlap.\n'
-      '4. Decide recommended_action per the action rubric: no_op (nothing '
-      'in the candidate set is substantively affected), review (at least '
-      'one affected candidate, first-pass human read needed), or amend '
-      '(the change requires a known update to a document or obligation '
-      'parameter).\n'
-      '5. Pick routing_destination per the destination glossary — the '
-      'single PRIMARY team accountable, not every team that could '
-      'conceivably help.\n'
-      '6. Self-assess overall confidence per the rubric; name the level '
-      'in confidence_rationale.'
+      'item_type, item_index, match_confidence, match_rationale, AND a '
+      'per-item (proposed_action, proposed_route) pair. Decide the '
+      'per-item action per the action rubric and the per-item route per '
+      'the destination glossary — route is a property of the item\'s '
+      'OWNERSHIP (which team owns this specific asset), not of the '
+      'Change as a whole.\n'
+      '4. Different items in the same mapping SHOULD route to different '
+      'teams when the item types differ: a tariff-filing document '
+      'routes to legal; a market-eligibility obligation routes to '
+      'market_ops; a telemetry data feed routes to it_metering. Do NOT '
+      'collapse per-item routes into one "primary team".\n'
+      '5. Self-assess overall mapping confidence per the rubric; name '
+      'the level in confidence_rationale.'
     ),
     details=(
       'Example 1 — narrow mapping (one obligation + one document):\n'
@@ -239,14 +247,19 @@ def build_mapping_prompt(
       'rubric below.\n'
       '- affected_items[*].match_rationale: one sentence naming the specific '
       'overlap between the change and this item.\n'
-      '- recommended_action: one of review / amend / no_op.\n'
-      '- routing_destination: one of market_ops / legal / it_metering — '
-      'the single PRIMARY team accountable (TDD §8.6 scope limit).\n'
+      '- affected_items[*].proposed_action: one of review / amend / no_op '
+      'per the action rubric below — the action YOU recommend for THIS '
+      'specific item (not for the Change as a whole).\n'
+      '- affected_items[*].proposed_route: one of market_ops / legal / '
+      'it_metering per the destination glossary below — the team that '
+      'OWNS this specific item (based on item_type and the glossary\'s '
+      '"owns" clauses). Different items in the SAME mapping can route '
+      'to different teams.\n'
       '- confidence: integer 0-5 per the confidence rubric below (overall '
       'mapping confidence, not per-item).\n'
       '- confidence_rationale: one sentence naming the rubric level and why.\n'
       '- rationale: one paragraph summarising WHY this change maps to these '
-      'items and this team.\n'
+      'items.\n'
       '- The harness owns mapping_id, tenant_id, environment, and change_id '
       '— do NOT emit these fields.'
     ),
@@ -277,24 +290,21 @@ def build_mapping_prompt(
       'the item specifies X" — not "the change may affect how X is '
       'handled." The hedge verb is the signal that you are reaching '
       'for topical adjacency rather than naming substantive effect.\n'
-      '- Do NOT pick recommended_action="amend" unless there is a known '
-      'document or obligation parameter requiring a concrete edit. '
-      '"amend" means "we know what to change"; "review" means "we need '
-      'to look first"; "no_op" means "nothing in the candidate set is '
-      'affected". When uncertain between review and amend, prefer '
+      '- Do NOT pick proposed_action="amend" on an item unless there is '
+      'a known concrete edit implied for THAT item (new required field '
+      'in this template, specific parameter edit on this obligation). '
+      '"amend" means "we know what to change on this item"; "review" '
+      'means "we need to look at this item first"; "no_op" means "this '
+      'item is substantively affected but requires no edit." When '
+      'uncertain between review and amend on a given item, prefer '
       'review.\n'
-      '- Do NOT emit confidence=5 on the overall mapping when '
-      'routing_destination is a multi-team judgment call. If the change '
-      'is a tariff edit (legal) AND requires market-eligibility changes '
-      '(market_ops), pick the PRIMARY team and drop overall confidence '
-      'to 3-4. When overall confidence is 3-4 because of a multi-team '
-      'touch, the confidence_rationale MUST explicitly name BOTH the '
-      'primary team AND the secondary team by name (e.g., "primary '
-      'legal, secondary market_ops because the tariff filing update is '
-      'the near-term artefact but size eligibility is a market-'
-      'participation parameter"). Saying "the primary accountable '
-      'function is legal because..." without naming market_ops is NOT '
-      'sufficient — Rachel needs to know which team to cc.'
+      '- Do NOT emit all affected items with the SAME proposed_route '
+      'when the Change touches multiple teams\' domains. A tariff edit '
+      'that also tightens a market-eligibility threshold produces at '
+      'least two routes: legal for the tariff document, market_ops for '
+      'the eligibility obligation. Routing by item ownership is what '
+      'makes per-pair curation work in Rachel\'s queue — collapsing '
+      'everything to one route defeats the point.'
     ),
     inputs_dict={
       'change_description': change_summary,
@@ -304,6 +314,19 @@ def build_mapping_prompt(
     },
     json_example=MAPPING_JSON_EXAMPLE,
   )
+
+
+_STUB_ACTION_BY_TYPE: dict[str, str] = {
+  'obligation': 'amend',
+  'document': 'review',
+  'project': 'review',
+}
+
+_STUB_ROUTE_BY_TYPE: dict[str, str] = {
+  'obligation': 'market_ops',
+  'document': 'legal',
+  'project': 'market_ops',
+}
 
 
 def stub_mapping_response(params: dict) -> MappingResponse:
@@ -324,6 +347,8 @@ def stub_mapping_response(params: dict) -> MappingResponse:
           item_index=i,
           match_confidence=4,
           match_rationale=f'source_authority references {change.proceeding_id}',
+          proposed_action=_STUB_ACTION_BY_TYPE['obligation'],  # type: ignore[arg-type]
+          proposed_route=_STUB_ROUTE_BY_TYPE['obligation'],  # type: ignore[arg-type]
         )
       )
       obligation_hits.add(obl.obligation_id)
@@ -335,6 +360,8 @@ def stub_mapping_response(params: dict) -> MappingResponse:
           item_index=i,
           match_confidence=3,
           match_rationale='project relates to an obligation affected by this change',
+          proposed_action=_STUB_ACTION_BY_TYPE['project'],  # type: ignore[arg-type]
+          proposed_route=_STUB_ROUTE_BY_TYPE['project'],  # type: ignore[arg-type]
         )
       )
   for i, doc in enumerate(documents):
@@ -345,12 +372,12 @@ def stub_mapping_response(params: dict) -> MappingResponse:
           item_index=i,
           match_confidence=3,
           match_rationale='document title/summary references DER',
+          proposed_action=_STUB_ACTION_BY_TYPE['document'],  # type: ignore[arg-type]
+          proposed_route=_STUB_ROUTE_BY_TYPE['document'],  # type: ignore[arg-type]
         )
       )
   return MappingResponse(
     affected_items=tuple(by_index),
-    recommended_action=_action_from_change_type(change.change_type),
-    routing_destination=_route_from_change_type(change.change_type),
     confidence=min(4, max(2, change.confidence - 1)),
     confidence_rationale='stub: inherits change confidence with a one-step uncertainty penalty',
     rationale=STUB_RATIONALE,
@@ -395,8 +422,6 @@ def map_change(
     environment=change.environment,
     change_id=change.change_id,
     affected_items=affected_items,
-    recommended_action=response.recommended_action,
-    routing_destination=response.routing_destination,
     confidence=response.confidence,
     confidence_rationale=response.confidence_rationale,
     rationale=response.rationale,
@@ -420,20 +445,6 @@ def _resolve_affected_item(
     item_id=target_id,
     match_confidence=item.match_confidence,
     match_rationale=item.match_rationale,
+    proposed_action=item.proposed_action,
+    proposed_route=item.proposed_route,
   )
-
-
-def _route_from_change_type(change_type: str) -> str:
-  if change_type in ('added', 'tightened'):
-    return 'market_ops'
-  if change_type == 'loosened':
-    return 'legal'
-  return 'market_ops'
-
-
-def _action_from_change_type(change_type: str) -> str:
-  if change_type == 'cosmetic':
-    return 'no_op'
-  if change_type in ('added', 'tightened'):
-    return 'amend'
-  return 'review'

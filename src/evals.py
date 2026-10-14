@@ -77,17 +77,21 @@ class ExpectedExtraction(BaseModel):
   description_keywords: tuple[str, ...]
 
 
+class ExpectedAffectedItem(BaseModel):
+  model_config = ConfigDict(extra='forbid')
+  item_type: Literal['obligation', 'project', 'document']
+  item_id: str
+  expected_action: Literal['review', 'amend', 'no_op']
+  expected_route: Literal['market_ops', 'legal', 'it_metering']
+
+
 class ExpectedMapping(BaseModel):
   model_config = ConfigDict(extra='forbid')
   change_match: tuple[str, int | None, int | None]
-  affected_obligation_ids: tuple[str, ...]
-  affected_project_ids: tuple[str, ...]
-  affected_document_ids: tuple[str, ...]
-  recommended_action: Literal['review', 'amend', 'no_op']
-  # Mirrors Mapping.routing_destination's v1 single-destination scope choice
-  # (TDD §8.6). Gold labels the primary team per change; secondary teams
-  # aren't modelled yet.
-  routing_destination: Literal['market_ops', 'legal', 'it_metering']
+  # Per-item expectations. Each affected item carries its own expected
+  # (action, route) because v1 closed TDD §8.6 (multi-reviewer routing):
+  # one Change touching N items can produce N (action, route) pairs.
+  affected_items: tuple[ExpectedAffectedItem, ...]
 
 
 class GoldCaseInput(BaseModel):
@@ -249,30 +253,25 @@ def score_mappings(
     key = tuple(exp.change_match)
     mapping = mappings_by_triple.get(key)
     if mapping is None:
-      item_fn = (
-        len(exp.affected_obligation_ids)
-        + len(exp.affected_project_ids)
-        + len(exp.affected_document_ids)
-      )
-      result.mapping_item_fn += item_fn
+      result.mapping_item_fn += len(exp.affected_items)
       continue
-    pred_obl_ids = {a.item_id for a in mapping.affected_items if a.item_type == 'obligation'}
-    pred_prj_ids = {a.item_id for a in mapping.affected_items if a.item_type == 'project'}
-    pred_doc_ids = {a.item_id for a in mapping.affected_items if a.item_type == 'document'}
-    for pred_set_, exp_set_ in (
-      (pred_obl_ids, set(exp.affected_obligation_ids)),
-      (pred_prj_ids, set(exp.affected_project_ids)),
-      (pred_doc_ids, set(exp.affected_document_ids)),
-    ):
-      result.mapping_item_tp += len(pred_set_ & exp_set_)
-      result.mapping_item_fp += len(pred_set_ - exp_set_)
-      result.mapping_item_fn += len(exp_set_ - pred_set_)
-    result.mapping_action_total += 1
-    if mapping.recommended_action == exp.recommended_action:
-      result.mapping_action_correct += 1
-    result.mapping_route_total += 1
-    if mapping.routing_destination == exp.routing_destination:
-      result.mapping_route_correct += 1
+    pred_by_key = {(a.item_type, a.item_id): a for a in mapping.affected_items}
+    exp_by_key = {(e.item_type, e.item_id): e for e in exp.affected_items}
+    for exp_key, exp_item in exp_by_key.items():
+      pred_item = pred_by_key.get(exp_key)
+      if pred_item is None:
+        result.mapping_item_fn += 1
+        continue
+      result.mapping_item_tp += 1
+      result.mapping_action_total += 1
+      if pred_item.proposed_action == exp_item.expected_action:
+        result.mapping_action_correct += 1
+      result.mapping_route_total += 1
+      if pred_item.proposed_route == exp_item.expected_route:
+        result.mapping_route_correct += 1
+    for pred_key in pred_by_key:
+      if pred_key not in exp_by_key:
+        result.mapping_item_fp += 1
 
 
 def _type(change: Change) -> str:

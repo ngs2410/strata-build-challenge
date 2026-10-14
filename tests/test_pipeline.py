@@ -100,8 +100,6 @@ def _mapping(confidence, affected_items=(), change_id='c-1'):
     environment='e',
     change_id=change_id,
     affected_items=tuple(affected_items),
-    recommended_action='review',
-    routing_destination='legal',
     confidence=confidence,
     confidence_rationale='r',
     rationale='r',
@@ -704,26 +702,6 @@ def test_mapping_rubrics_contains_only_confidence_action_and_routing():
   assert 'prevents id hallucination' in field_intents_section
 
 
-def test_mapping_prompt_pitfall_requires_naming_both_teams_on_multi_touch():
-  # Observed at gpt-5.4-nano on §(A) tightened change: nano correctly
-  # dropped overall confidence to 4 (per the multi-team pitfall) but
-  # wrote confidence_rationale="primary accountable function is
-  # legal..." WITHOUT naming market_ops as the secondary team. The
-  # pitfall must explicitly require BOTH team names and give a
-  # concrete example of the right shape.
-  change = _change('tightened')
-  prompt = build_mapping_prompt(
-    change, obligations=[], projects=[], documents=[], candidate_set_size=50
-  )
-  _, user = prompt.render()
-  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
-  assert 'MUST explicitly name BOTH' in pitfalls_section
-  # Concrete example form with both team names present.
-  assert 'primary legal, secondary market_ops' in pitfalls_section
-  # Explicit anti-pattern.
-  assert 'Rachel needs to know which team to cc' in pitfalls_section
-
-
 def test_mapping_prompt_pitfalls_reject_hedge_verbs_in_match_rationale():
   # Observed failure mode at gpt-5.4-nano on §(A) tightened change: the
   # model emitted TWO borderline items at match_confidence=3 whose
@@ -810,23 +788,7 @@ def test_mapping_prompt_has_steps_details_pitfalls_sections():
   assert 'topically adjacent' in pitfalls_section
   assert 'match_confidence' in pitfalls_section
   assert 'amend' in pitfalls_section
-  assert 'routing_destination' in pitfalls_section
-
-
-@pytest.mark.parametrize(
-  'change_type,expected_destination,expected_action',
-  [
-    ('added', 'market_ops', 'amend'),
-    ('tightened', 'market_ops', 'amend'),
-    ('loosened', 'legal', 'review'),
-    ('cosmetic', 'market_ops', 'no_op'),
-    ('removed', 'market_ops', 'review'),
-  ],
-)
-def test_map_change_routes_by_change_type(change_type, expected_destination, expected_action):
-  mapping = map_change(_change(change_type), obligations=[], projects=[], documents=[])
-  assert mapping.routing_destination == expected_destination
-  assert mapping.recommended_action == expected_action
+  assert 'proposed_route' in pitfalls_section
 
 
 def test_map_change_translates_llm_index_response_into_item_ids(verdant_grid_seeded):
@@ -866,8 +828,22 @@ def test_enqueue_mapping_priority_increases_with_affected_items():
   bigger = _mapping(
     confidence=4,
     affected_items=(
-      AffectedItem(item_type='obligation', item_id='o-1', match_confidence=4, match_rationale='r'),
-      AffectedItem(item_type='project', item_id='p-1', match_confidence=3, match_rationale='r'),
+      AffectedItem(
+        item_type='obligation',
+        item_id='o-1',
+        match_confidence=4,
+        match_rationale='r',
+        proposed_action='amend',
+        proposed_route='market_ops',
+      ),
+      AffectedItem(
+        item_type='project',
+        item_id='p-1',
+        match_confidence=3,
+        match_rationale='r',
+        proposed_action='review',
+        proposed_route='market_ops',
+      ),
     ),
   )
   smaller = _mapping(confidence=4)

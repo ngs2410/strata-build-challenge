@@ -94,48 +94,114 @@
       "expected_mappings": [
         {
           "change_match": ["loosened", 1, 1],
-          "affected_obligation_ids": ["VG-OBL-DER-SIZE-01"],
-          "affected_project_ids": ["VG-PRJ-DER-AGGR-PHASE1"],
-          "affected_document_ids": [
-            "VG-DOC-TARIFF-FILING-2026Q4",
-            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
-          ],
-          "recommended_action": "review",
-          "routing_destination": "legal"
+          "affected_items": [
+            {
+              "item_type": "obligation",
+              "item_id": "VG-OBL-DER-SIZE-01",
+              "expected_action": "amend",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "project",
+              "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+              "expected_action": "review",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
+              "expected_action": "amend",
+              "expected_route": "legal"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+              "expected_action": "review",
+              "expected_route": "legal"
+            }
+          ]
         },
         {
           "change_match": ["tightened", 2, 2],
-          "affected_obligation_ids": [
-            "VG-OBL-DER-REG-01",
-            "VG-OBL-DER-DISPATCH-NOTIF-01"
-          ],
-          "affected_project_ids": [
-            "VG-PRJ-DER-AGGR-PHASE1",
-            "VG-PRJ-DER-TRAINING-FY2027"
-          ],
-          "affected_document_ids": [
-            "VG-DOC-DER-OPS-PROC-v3.2",
-            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
-          ],
-          "recommended_action": "amend",
-          "routing_destination": "market_ops"
+          "affected_items": [
+            {
+              "item_type": "obligation",
+              "item_id": "VG-OBL-DER-REG-01",
+              "expected_action": "amend",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "obligation",
+              "item_id": "VG-OBL-DER-DISPATCH-NOTIF-01",
+              "expected_action": "review",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "project",
+              "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+              "expected_action": "review",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "project",
+              "item_id": "VG-PRJ-DER-TRAINING-FY2027",
+              "expected_action": "review",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
+              "expected_action": "amend",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+              "expected_action": "amend",
+              "expected_route": "legal"
+            }
+          ]
         },
         {
           "change_match": ["added", null, 3],
-          "affected_obligation_ids": [
-            "VG-OBL-DER-TEL-01",
-            "VG-OBL-DER-METER-01"
-          ],
-          "affected_project_ids": [
-            "VG-PRJ-DER-AGGR-PHASE1",
-            "VG-PRJ-AMI-TELEMETRY-UPGRADE"
-          ],
-          "affected_document_ids": [
-            "VG-DOC-DER-OPS-PROC-v3.2",
-            "VG-DOC-MISO-DER-COMPLIANCE-PLAN"
-          ],
-          "recommended_action": "amend",
-          "routing_destination": "it_metering"
+          "affected_items": [
+            {
+              "item_type": "obligation",
+              "item_id": "VG-OBL-DER-TEL-01",
+              "expected_action": "amend",
+              "expected_route": "it_metering"
+            },
+            {
+              "item_type": "obligation",
+              "item_id": "VG-OBL-DER-METER-01",
+              "expected_action": "review",
+              "expected_route": "it_metering"
+            },
+            {
+              "item_type": "project",
+              "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+              "expected_action": "review",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "project",
+              "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+              "expected_action": "amend",
+              "expected_route": "it_metering"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
+              "expected_action": "amend",
+              "expected_route": "market_ops"
+            },
+            {
+              "item_type": "document",
+              "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+              "expected_action": "amend",
+              "expected_route": "legal"
+            }
+          ]
         }
       ],
       "company_context_tenant": "verdant_grid"

@@ -1,0 +1,44 @@
+[
+  {
+    "project_id": "VG-PRJ-DER-AGGR-PHASE1",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "name": "MISO DER Aggregation Program — Phase 1",
+    "description": "Launch DER aggregation participation in MISO energy markets for behind-the-meter solar + storage.",
+    "status": "in_progress",
+    "related_obligations": [
+      "VG-OBL-DER-REG-01",
+      "VG-OBL-DER-TEL-01",
+      "VG-OBL-DER-SIZE-01",
+      "VG-OBL-DER-DISPATCH-NOTIF-01"
+    ],
+    "owner": "market_ops"
+  },
+  {
+    "project_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "name": "AMI Telemetry Upgrade for Behind-the-Meter Resources",
+    "description": "Deploy telemetry streaming from AMI endpoints to support DER aggregation reporting.",
+    "status": "planned",
+    "related_obligations": [
+      "VG-OBL-DER-TEL-01",
+      "VG-OBL-DER-METER-01"
+    ],
+    "owner": "it_metering"
+  },
+  {
+    "project_id": "VG-PRJ-DER-TRAINING-FY2027",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "name": "DER Aggregation Workforce Training (FY27)",
+    "description": "Train market-ops dispatchers and settlement analysts on the new DER aggregation flows ahead of Phase 2 go-live.",
+    "status": "planned",
+    "related_obligations": [
+      "VG-OBL-DER-REG-01",
+      "VG-OBL-DER-DISPATCH-NOTIF-01",
+      "VG-OBL-DER-SETTLEMENT-01"
+    ],
+    "owner": "market_ops"
+  }
+]

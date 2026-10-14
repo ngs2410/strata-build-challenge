@@ -1,0 +1,57 @@
+[
+  {
+    "document_id": "VG-DOC-DER-OPS-PROC-v3.2",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "document_type": "procedure",
+    "title": "DER Aggregation Operating Procedure v3.2",
+    "summary": "Internal operating procedure covering DER registration, telemetry, and market offer submission.",
+    "full_text": "This procedure governs how Verdant Grid's DER aggregation team registers resources with MISO, maintains telemetry, and submits market offers. See §4 for registration workflow.",
+    "last_reviewed_at": "2026-07-01T00:00:00Z",
+    "owner": "market_ops"
+  },
+  {
+    "document_id": "VG-DOC-TARIFF-FILING-2026Q4",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "document_type": "tariff_filing",
+    "title": "Draft Tariff Filing — DER Aggregation Compliance (2026 Q4)",
+    "summary": "Draft Verdant Grid tariff filing responding to MISO's Order 2222 compliance plan.",
+    "full_text": "Draft filing addresses aggregator registration lead time, telemetry obligations, and minimum size interoperability.",
+    "last_reviewed_at": "2026-09-15T00:00:00Z",
+    "owner": "legal"
+  },
+  {
+    "document_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "document_type": "policy",
+    "title": "Verdant Grid MISO DER Aggregation Compliance Plan v2.1",
+    "summary": "Verdant's internal policy document describing how its DER aggregation program complies with FERC Order 2222 and MISO's compliance filing.",
+    "full_text": "This plan covers registration, telemetry, settlement, and dispute-handling for Verdant's DER aggregation program against MISO's Order 2222 compliance filing. Owners: Market Operations lead + Legal lead.",
+    "last_reviewed_at": "2026-08-01T00:00:00Z",
+    "owner": "market_ops"
+  },
+  {
+    "document_id": "VG-DOC-DER-SETTLEMENT-PROC",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "document_type": "procedure",
+    "title": "DER Aggregation Settlement Procedure v1.0",
+    "summary": "Internal procedure for receiving MISO settlement payments on DER aggregation offers and remitting customer shares.",
+    "full_text": "Market-ops settlement team runs this procedure after each MISO settlement cycle. Covers DER-level allocation, customer remittance, and dispute handling.",
+    "last_reviewed_at": "2026-06-15T00:00:00Z",
+    "owner": "market_ops"
+  },
+  {
+    "document_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "document_type": "template",
+    "title": "DER Participant Communication Template",
+    "summary": "Outbound communication template used to notify DER aggregation participants of program changes, dispatch events, and settlement timing.",
+    "full_text": "Fill-in template for customer-facing comms about DER aggregation program status, dispatch pre-notification, and settlement remittance.",
+    "last_reviewed_at": "2026-05-20T00:00:00Z",
+    "owner": "market_ops"
+  }
+]

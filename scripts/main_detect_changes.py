@@ -22,6 +22,12 @@ Flags:
     dispatch prints the rendered prompt + estimated tokens and blocks
     for operator `y/n`. Does NOT force `n_jobs=1` (TDD §4.1 — fan-out
     semantics around confirm are handled inside ModelCaller).
+  * `--stub_all` — monkey-patches `load_domain_config` to rewrite every
+    task's `model_identifier` to `stub://<task_name>`, forcing the
+    whole pipeline through `StubBackend`. Mirrors the autouse
+    `stub_all_task_configs` conftest fixture. Intended for regenerating
+    the committed demo snapshot (`data/tenants/verdant_grid/prod/*`)
+    without an API key — see README "Demo snapshot" section.
 '''
 
 from absl import app, flags
@@ -43,11 +49,35 @@ flags.DEFINE_boolean(
   'Interactively confirm each LLM call before dispatch — prints the rendered '
   'prompt + token-count estimate and prompts y/n. Useful for prompt debugging.',
 )
+flags.DEFINE_boolean(
+  'stub_all',
+  False,
+  'Rewrite every task_model_config.model_identifier to stub://<task_name> so '
+  "the entire pipeline runs through StubBackend. Used to regenerate the "
+  'committed demo snapshot without an API key.',
+)
 
 
 def _run() -> None:
+  if FLAGS.stub_all:
+    _install_stub_all_config()
   model_caller.set_confirm_llm(FLAGS.confirm_llm)
   run_pipeline(FLAGS.tenant_id, FLAGS.environment, dry_run=FLAGS.dry_run)
+
+
+def _install_stub_all_config() -> None:
+  import src.model_caller as mc_mod
+  from src.config import load_domain_config as _real_load
+
+  def _stub_everything(tenant_id, environment):
+    config = _real_load(tenant_id, environment)
+    rewritten = {
+      name: tc.model_copy(update={'model_identifier': f'stub://{name}'})
+      for name, tc in config.task_model_configs.items()
+    }
+    return config.model_copy(update={'task_model_configs': rewritten})
+
+  mc_mod.load_domain_config = _stub_everything
 
 
 def main(argv):

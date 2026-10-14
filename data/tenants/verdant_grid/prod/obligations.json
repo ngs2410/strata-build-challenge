@@ -1,0 +1,90 @@
+[
+  {
+    "obligation_id": "VG-OBL-DER-REG-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "procedural",
+    "summary": "Register each DER in an aggregation with MISO before market participation.",
+    "full_text": "Verdant Grid shall register each distributed energy resource participating in a MISO aggregation prior to the resource's first market activity, providing physical location and operational characteristics per the MISO tariff.",
+    "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(B); MISO Tariff Module C §38.6",
+    "status": "active",
+    "owner": "market_ops"
+  },
+  {
+    "obligation_id": "VG-OBL-DER-TEL-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "operational",
+    "summary": "Maintain telemetry feed for aggregated DER resources.",
+    "full_text": "Verdant Grid's DER aggregation operations shall maintain a continuous telemetry feed to MISO for all aggregated resources participating in wholesale markets.",
+    "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(C)",
+    "status": "active",
+    "owner": "it_metering"
+  },
+  {
+    "obligation_id": "VG-OBL-DER-SIZE-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "procedural",
+    "summary": "Honor RTO-set minimum aggregation size thresholds where applicable.",
+    "full_text": "Where the RTO establishes a minimum size requirement for DER aggregations, Verdant Grid's aggregation offers shall meet or exceed the published threshold.",
+    "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(A)",
+    "status": "proposed",
+    "owner": "market_ops"
+  },
+  {
+    "obligation_id": "VG-OBL-DER-METER-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "operational",
+    "summary": "Meter each DER's per-resource output within the aggregation.",
+    "full_text": "Verdant Grid shall meter each distributed energy resource's individual output at interval granularity required for RTO settlement, independent of the aggregated meter.",
+    "source_authority": "FERC Order 2222 §35.28(g)(1)(ix)(C); MISO BPM-025 §4.2",
+    "status": "active",
+    "owner": "it_metering"
+  },
+  {
+    "obligation_id": "VG-OBL-DER-SETTLEMENT-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "financial",
+    "summary": "Settle DER aggregation market revenues per MISO's settlement calendar.",
+    "full_text": "Verdant Grid shall receive settlement payments from MISO for cleared DER aggregation offers and remit customer shares per the DER aggregator agreement.",
+    "source_authority": "FERC Order 2222 §35.28(g)(1)(ix); MISO Tariff Module A §7.4",
+    "status": "proposed",
+    "owner": "market_ops"
+  },
+  {
+    "obligation_id": "VG-OBL-DER-DISPATCH-NOTIF-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "procedural",
+    "summary": "Notify DER aggregation participants ahead of dispatch instructions.",
+    "full_text": "Verdant Grid shall provide pre-dispatch notification to each DER aggregation participant per the terms of the customer DER aggregation agreement.",
+    "source_authority": "Verdant Grid DER Aggregation Terms of Service §6.1",
+    "status": "active",
+    "owner": "market_ops"
+  },
+  {
+    "obligation_id": "VG-OBL-OUTAGE-REPORT-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "reporting",
+    "summary": "Monthly outage reporting to the state PUC.",
+    "full_text": "Verdant Grid shall submit a monthly outage report covering sustained interruptions by distribution feeder to the state Public Utility Commission by the 10th of the following month.",
+    "source_authority": "State PUC Rule 7.14(a)",
+    "status": "active",
+    "owner": "legal"
+  },
+  {
+    "obligation_id": "VG-OBL-RPS-FILING-01",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "obligation_type": "reporting",
+    "summary": "Annual Renewable Portfolio Standard filing to the state PUC.",
+    "full_text": "Verdant Grid shall file an annual RPS compliance filing listing retired RECs by month and sources procured.",
+    "source_authority": "State RPS Rule §4.2",
+    "status": "active",
+    "owner": "legal"
+  }
+]

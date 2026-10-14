@@ -1,0 +1,92 @@
+[
+  {
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "nopr-2019-11",
+    "status": "draft",
+    "docket_number": "RM18-9",
+    "issued_at": "2019-11-21T00:00:00Z",
+    "source_url": "https://www.ferc.gov/sites/default/files/2020-06/E-1_0.pdf",
+    "passages": [
+      {
+        "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p1",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 1,
+        "text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\naggregator registration process shall not include a minimum size\nrequirement for the aggregated resources."
+      },
+      {
+        "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p2",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 2,
+        "text": "(B) The aggregator shall register each distributed energy resource that\nis included in the aggregation with the Regional Transmission\nOrganization or Independent System Operator. The registration shall\ninclude the physical location of each distributed energy resource and\nits physical and operational characteristics."
+      },
+      {
+        "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p3",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 3,
+        "text": "(C) The aggregator shall provide the Regional Transmission Organization\nor Independent System Operator with information sufficient to permit\nthe Regional Transmission Organization or Independent System Operator\nto confirm that the resources in the aggregation have the capability to\nprovide the services for which the aggregation is bidding."
+      }
+    ]
+  },
+  {
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "final-2020-09",
+    "status": "final",
+    "docket_number": "RM18-9",
+    "issued_at": "2020-09-17T00:00:00Z",
+    "source_url": "https://www.ferc.gov/sites/default/files/2020-09/E-1_0.pdf",
+    "passages": [
+      {
+        "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p1",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 1,
+        "text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\nRegional Transmission Organization or Independent System Operator may\nestablish a minimum size requirement for the aggregated resources that\ndoes not exceed 100 kW."
+      },
+      {
+        "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p2",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 2,
+        "text": "(B) The aggregator shall register each distributed energy resource that\nis included in the aggregation with the Regional Transmission\nOrganization or Independent System Operator at least 60 days before the\ndistributed energy resource participates in the aggregation. The\nregistration shall include the physical location, the point of\ninterconnection, and the physical and operational characteristics of\neach distributed energy resource."
+      },
+      {
+        "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p3",
+        "section_path": [
+          "§35.28",
+          "g",
+          "1",
+          "ix"
+        ],
+        "position": 3,
+        "text": "(C) The aggregator shall provide the Regional Transmission Organization\nor Independent System Operator with information sufficient to permit\nthe Regional Transmission Organization or Independent System Operator\nto confirm that the resources in the aggregation have the capability to\nprovide the services for which the aggregation is bidding, and shall\nprovide a telemetry feed for aggregated resources rated at or above 100\nkW."
+      }
+    ]
+  }
+]

@@ -37,7 +37,14 @@ mutants/
 .embedding_cache
 .model_cache/
 
-# Generated pipeline outputs — regenerate via scripts/main_detect_changes.py
+# Generated pipeline outputs — regenerate via scripts/main_detect_changes.py.
+# The verdant_grid/prod/ snapshot is deliberately committed as the demo
+# fixture (see README "Demo snapshot" section) so a reviewer can
+# `uvicorn src.web_app:app` immediately after clone with no API key or
+# pipeline run. Regenerate it with:
+#   rm data/tenants/verdant_grid/prod/*.json data/tenants/verdant_grid/prod/*.jsonl
+#   env3.12/bin/python -m scripts.main_detect_changes --stub_all
+# All other tenants / environments remain gitignored.
 data/tenants/*/*/proceedings.json
 data/tenants/*/*/obligations.json
 data/tenants/*/*/projects.json
@@ -46,7 +53,20 @@ data/tenants/*/*/changes.json
 data/tenants/*/*/extracted_obligations.json
 data/tenants/*/*/mappings.json
 data/tenants/*/*/review_items.json
+data/tenants/*/*/asset_decisions.json
 data/tenants/*/*/audit_log.jsonl
+
+# Un-ignore the committed demo snapshot. The ! negates for the specific path.
+!data/tenants/verdant_grid/prod/proceedings.json
+!data/tenants/verdant_grid/prod/obligations.json
+!data/tenants/verdant_grid/prod/projects.json
+!data/tenants/verdant_grid/prod/documents.json
+!data/tenants/verdant_grid/prod/changes.json
+!data/tenants/verdant_grid/prod/extracted_obligations.json
+!data/tenants/verdant_grid/prod/mappings.json
+!data/tenants/verdant_grid/prod/review_items.json
+!data/tenants/verdant_grid/prod/asset_decisions.json
+!data/tenants/verdant_grid/prod/audit_log.jsonl
 
 # Eval-run reports (regenerate via scripts/main_eval.py)
 output/

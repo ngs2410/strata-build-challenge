@@ -1,0 +1,71 @@
+[
+  {
+    "change_id": "ferc-order-2222:change-001",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "change_type": "loosened",
+    "description": "Final Rule permits RTOs/ISOs to establish an aggregation minimum size up to 100 kW; NOPR explicitly disallowed any minimum size.",
+    "prior_citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p1",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": true,
+      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+    },
+    "new_citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p1",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": true,
+      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+    },
+    "confidence": 4,
+    "confidence_rationale": "Direct textual contrast between subsection (A) of NOPR and Final Rule — stub-generated against the sample excerpts.",
+    "detected_at": "2026-10-14T01:51:50.406999Z"
+  },
+  {
+    "change_id": "ferc-order-2222:change-002",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "change_type": "tightened",
+    "description": "Final Rule requires aggregator registration at least 60 days before participation; NOPR had no lead-time requirement.",
+    "prior_citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p2",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": true,
+      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+    },
+    "new_citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p2",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": true,
+      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+    },
+    "confidence": 4,
+    "confidence_rationale": "Subsection (B) adds the 60-day lead time in Final; stub-generated against the sample excerpts.",
+    "detected_at": "2026-10-14T01:51:50.406999Z"
+  },
+  {
+    "change_id": "ferc-order-2222:change-003",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "change_type": "added",
+    "description": "Final Rule introduces a telemetry-feed requirement for aggregated resources rated ≥100 kW; NOPR had no telemetry requirement.",
+    "prior_citation": null,
+    "new_citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p3",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": true,
+      "verification_rationale": "stub verifier: cited passage trivially supports claim at v1 scale"
+    },
+    "confidence": 5,
+    "confidence_rationale": "Final subsection (C) adds the telemetry obligation; stub-generated against the sample excerpts.",
+    "detected_at": "2026-10-14T01:51:50.406999Z"
+  }
+]

@@ -175,22 +175,65 @@ Verdant Grid queue. The UI has two pages:
 
 - `/queue?tenant_id=verdant_grid&environment=prod` — Rachel's
   prioritized review queue (template:
-  [`templates/queue.html`](templates/queue.html)). Each row shows
+  [`templates/queue.html`](templates/queue.html)). Each card shows
   the detected change, the cited passage text with the citing span
-  `<mark>`-highlighted inline, the verification status, the
-  mapping's affected items, recommended action, routing destination,
-  and three action buttons (**approve** / **override** /
-  **escalate**) that write an
-  [`AuditEvent`](TDD.md#27-auditevent) and transition the
-  [`ReviewItem`](TDD.md#26-reviewitem).
+  `<mark>`-highlighted inline, the verification status, and a
+  per-pair table of affected (change × asset) rows with per-item
+  proposed action + proposed route. Rachel multi-selects rows and
+  decides each pair via the bulk toolbar — **approve**, **override**,
+  **dismiss**, or **escalate**. Each decision writes an
+  [`AssetDecision`](TDD.md#26b-assetdecision) and emits an
+  [`AuditEvent`](TDD.md#27-auditevent); bulk decisions share a
+  `batch_id`.
 - `/audit?tenant_id=verdant_grid&environment=prod` — read-only
   chronological `AuditEvent` list (template:
-  [`templates/audit.html`](templates/audit.html)). Rollback is
-  deferred to future work
+  [`templates/audit.html`](templates/audit.html)); `batch_id` is
+  surfaced per event so grouped bulk decisions are visible. Rollback
+  is deferred to future work
   ([TDD §8.8](TDD.md#88-pure-fold-over-log-state--rollback)).
 
 Flags: `--host`, `--port` (default 8000), `--reload` (dev-time
 auto-reload).
+
+### Demo snapshot (populated UI immediately after clone)
+
+The repo ships with a committed snapshot of the pipeline outputs for
+the Verdant Grid demo tenant at
+`data/tenants/verdant_grid/prod/`. This includes the review items,
+mappings, changes, extracted obligations, ingested proceedings /
+obligations / projects / documents, and the audit log — exactly what
+the `/queue` and `/audit` pages read. So after `git clone` you can
+run `python -m scripts.main_review` and the UI is populated
+immediately — no API key, no pipeline run.
+
+The snapshot is a `--stub_all` run — every LLM task was dispatched
+through the deterministic
+[`StubBackend`](src/backends/stub_backend.py) so the fixture is
+reproducible from the committed seed data (proceedings text,
+company context, gold set) without burning tokens. The mapping /
+version-diff / extraction content is therefore stub-generated and
+simpler than a real LLM would produce; see
+[the Known limitations section](#known-limitations) for the
+small-model calibration caveats that apply to real runs.
+
+**Regenerate the snapshot** after a schema change or a prompt /
+stub tweak:
+
+```
+rm data/tenants/verdant_grid/prod/*.json data/tenants/verdant_grid/prod/*.jsonl
+env3.12/bin/python -m scripts.main_detect_changes --stub_all
+git add data/tenants/verdant_grid/prod/
+```
+
+Running the pipeline against a real OpenAI backend (drop the
+`--stub_all` flag; set `OPENAI_API_KEY` first) overwrites the
+snapshot with actual LLM outputs. Commit those instead if you want
+the demo to reflect real model behaviour — but be aware they will
+drift as prompts change.
+
+The `.gitignore` has explicit un-ignore (`!…`) lines for the
+`verdant_grid/prod/*.json` + `audit_log.jsonl` paths; every other
+tenant / environment stays ignored (see [`.gitignore`](.gitignore)).
 
 ## Run the evals
 

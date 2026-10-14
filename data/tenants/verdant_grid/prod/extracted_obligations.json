@@ -1,0 +1,40 @@
+[
+  {
+    "extraction_id": "ferc-order-2222:nopr-2019-11:ext-001",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "nopr-2019-11",
+    "obligation_type": "procedural",
+    "summary": "Aggregators must register each DER with the RTO/ISO prior to its participation.",
+    "full_text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\naggregator registration process shall not include a minimum size\nrequirement for the aggregated resources.",
+    "citation": {
+      "passage_id": "ferc-order-2222:nopr-2019-11:§35.28(g)(1)(ix):p1",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 4,
+    "confidence_rationale": "stub extraction: hand-constructed example obligation covering the registration lead-time clause; real impl calls obligation_extraction LLM task"
+  },
+  {
+    "extraction_id": "ferc-order-2222:final-2020-09:ext-001",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "proceeding_id": "ferc-order-2222",
+    "version_id": "final-2020-09",
+    "obligation_type": "procedural",
+    "summary": "Aggregators must register each DER with the RTO/ISO prior to its participation.",
+    "full_text": "(A) Each Regional Transmission Organization and Independent System\nOperator shall accept bids from distributed energy resource aggregators\nto participate in its organized wholesale electric markets. The\nRegional Transmission Organization or Independent System Operator may\nestablish a minimum size requirement for the aggregated resources that\ndoes not exceed 100 kW.",
+    "citation": {
+      "passage_id": "ferc-order-2222:final-2020-09:§35.28(g)(1)(ix):p1",
+      "start_offset": 0,
+      "end_offset": 200,
+      "verified": false,
+      "verification_rationale": "pending citation_verify stage"
+    },
+    "confidence": 4,
+    "confidence_rationale": "stub extraction: hand-constructed example obligation covering the registration lead-time clause; real impl calls obligation_extraction LLM task"
+  }
+]

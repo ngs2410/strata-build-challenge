@@ -1,0 +1,347 @@
+[
+  {
+    "mapping_id": "ferc-order-2222:change-001:mapping",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "change_id": "ferc-order-2222:change-001",
+    "affected_items": [
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-REG-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-TEL-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SIZE-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-METER-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SETTLEMENT-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      }
+    ],
+    "confidence": 3,
+    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
+    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+  },
+  {
+    "mapping_id": "ferc-order-2222:change-002:mapping",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "change_id": "ferc-order-2222:change-002",
+    "affected_items": [
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-REG-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-TEL-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SIZE-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-METER-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SETTLEMENT-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      }
+    ],
+    "confidence": 3,
+    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
+    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+  },
+  {
+    "mapping_id": "ferc-order-2222:change-003:mapping",
+    "tenant_id": "verdant_grid",
+    "environment": "prod",
+    "change_id": "ferc-order-2222:change-003",
+    "affected_items": [
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-REG-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-TEL-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SIZE-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-METER-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "obligation",
+        "item_id": "VG-OBL-DER-SETTLEMENT-01",
+        "match_confidence": 4,
+        "match_rationale": "source_authority references ferc-order-2222",
+        "proposed_action": "amend",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-AGGR-PHASE1",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-AMI-TELEMETRY-UPGRADE",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "project",
+        "item_id": "VG-PRJ-DER-TRAINING-FY2027",
+        "match_confidence": 3,
+        "match_rationale": "project relates to an obligation affected by this change",
+        "proposed_action": "review",
+        "proposed_route": "market_ops"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-OPS-PROC-v3.2",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-TARIFF-FILING-2026Q4",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-MISO-DER-COMPLIANCE-PLAN",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-DER-SETTLEMENT-PROC",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      },
+      {
+        "item_type": "document",
+        "item_id": "VG-DOC-STAKEHOLDER-COMM-TEMPLATE",
+        "match_confidence": 3,
+        "match_rationale": "document title/summary references DER",
+        "proposed_action": "review",
+        "proposed_route": "legal"
+      }
+    ],
+    "confidence": 4,
+    "confidence_rationale": "stub: inherits change confidence with a one-step uncertainty penalty",
+    "rationale": "stub mapping: assigns affected items by naive match on obligation source_authority / project name containing the proceeding_id; real impl calls the mapping LLM task"
+  }
+]

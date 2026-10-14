@@ -33,12 +33,13 @@ Read these first; the panel review follows roughly this order.
 - [**TDD.md**](TDD.md) — technical design.
   [Architecture](TDD.md#1-system-overview),
   [data model](TDD.md#2-data-model),
-  the 7-stage pipeline ([ingest](TDD.md#31-ingest) →
+  the 6-stage pipeline ([ingest](TDD.md#31-ingest) →
   [diff](TDD.md#32-version-diff) →
-  [cite](TDD.md#33-citation-grounding-depth-area) →
+  [verify](TDD.md#34-citation-verification-depth-area) →
   [extract](TDD.md#35-obligation-extraction) →
-  [map](TDD.md#36-mapping) → route →
-  [review/audit](TDD.md#37-review--audit)),
+  [map](TDD.md#36-mapping) → enqueue), plus the
+  [review workspace](TDD.md#37-review--audit) layered on the
+  persisted outputs,
   [cross-cutting services](TDD.md#4-cross-cutting-infrastructure),
   [evals](TDD.md#5-evals-depth-area),
   [scaling pathway](TDD.md#7-scaling-pathway),
@@ -146,8 +147,27 @@ Also useful:
 python -m scripts.main_detect_changes --tenant_id=verdant_grid --environment=prod
 ```
 
+To see every LLM prompt and response as the pipeline runs, add
+`--confirm_llm`:
+
+```
+python -m scripts.main_detect_changes --tenant_id=verdant_grid --environment=prod --confirm_llm
+```
+
+The pipeline pauses before each LLM dispatch, prints the fully-
+rendered system + user messages and a token-count estimate, and
+waits for `y/n` on stdin. After the OpenAI call returns the pipeline
+pretty-prints the parsed response (indented JSON of the Pydantic
+model). This is the best way to inspect what the model actually sees
+and emits for `version_diff`, `citation_verify`,
+`obligation_extraction`, and `mapping` — the plumbing lives in
+[`src/model_caller.py`](src/model_caller.py) (`_prompt_user` +
+`_print_response`). Cache hits short-circuit the pause so a warm
+run is still fast; a cold-cache run with `--confirm_llm` typically
+has 7 pauses matching the 7 LLM calls (see count below).
+
 This drives [`scripts/main_detect_changes.py`](scripts/main_detect_changes.py)
-through [`src/pipeline.py`](src/pipeline.py) — the full 7-stage
+through [`src/pipeline.py`](src/pipeline.py) — the full 6-stage
 pipeline ([TDD §3](TDD.md#3-the-core-pipeline)) against the FERC
 Order 2222 NOPR → Final Rule excerpts shipped in
 [`data/tenants/verdant_grid/`](data/tenants/verdant_grid) and
@@ -319,7 +339,7 @@ Top-level directories: [`src/`](src), [`config/`](config),
 src/                          Library code
   config.py                   Pydantic models + load_domain_config
   ingest.py                   Load proceedings + company context
-  pipeline.py                 Orchestrates the 7-stage pipeline
+  pipeline.py                 Orchestrates the 6-stage pipeline
   version_diff.py             LLM task: detect material changes
   citation/
     citation_grounding.py     Substring-match citing_span → offsets

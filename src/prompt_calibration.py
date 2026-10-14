@@ -30,6 +30,14 @@ the same perspective rule):
     "over-confidence is worse than under-confidence" so low-confidence
     outputs reliably escalate (Strata invariant: the system fails to a
     reviewer, not to a guess).
+  * `RECOMMENDED_ACTION_RUBRIC` — the three `Mapping.recommended_action`
+    `Literal` values (no_op / review / amend) with the decision rule
+    for picking each. Shared so a future rerouter or triage prompt
+    doesn't re-define.
+  * `ROUTING_DESTINATION_GLOSSARY` — the three
+    `Mapping.routing_destination` `Literal` values (market_ops / legal /
+    it_metering) with the ownership scope of each team. Prevents the
+    LLM from routing by keyword match alone.
 
 The rubrics are built from source dicts (`OBLIGATION_TYPES`, `CHANGE_TYPES`,
 `CONFIDENCE_LEVELS`) so adding a value is a dict edit, not a prose rewrite.
@@ -200,3 +208,77 @@ def _build_confidence_rubric() -> str:
 OBLIGATION_TAXONOMY_REFERENCE: str = _build_obligation_taxonomy()
 CHANGE_TYPE_RUBRIC: str = _build_change_type_rubric()
 CONFIDENCE_LEVEL_RUBRIC: str = _build_confidence_rubric()
+
+
+RECOMMENDED_ACTIONS: dict[str, str] = {
+  'no_op': (
+    "Nothing in the candidate set is substantively affected. The change is "
+    "topically relevant but no obligation, project, or document in the "
+    "company context requires any update. Choose when match_confidence on "
+    "every candidate would be 2 or lower (and those matches are therefore "
+    "omitted entirely)."
+  ),
+  'review': (
+    "At least one candidate is substantively affected AND a first-pass "
+    "human read is needed to decide WHAT to update. Choose when the "
+    "affected item is clear but the required edit is a judgment call "
+    "(e.g., 'tariff needs an update but Rachel needs to decide which "
+    "sections')."
+  ),
+  'amend': (
+    "At least one candidate is substantively affected AND there is a known "
+    "concrete update (e.g., add a new required field to a form template, "
+    "edit a specific tariff section, update an obligation parameter). "
+    "Choose when the required edit is directly implied by the change text "
+    "itself. When uncertain between review and amend, prefer review."
+  ),
+}
+
+ROUTING_DESTINATIONS: dict[str, str] = {
+  'market_ops': (
+    "Market participation and operational workflows. Owns changes that "
+    "affect wholesale market bidding, dispatch, settlement calendars, "
+    "size-eligibility thresholds, participation registration, and "
+    "day-ahead / real-time operational cadence. Does NOT own external "
+    "regulatory filings or policy documents."
+  ),
+  'legal': (
+    "External regulatory submissions and policy. Owns changes that affect "
+    "tariff filings, compliance plans, external forms (SEC, FERC, state "
+    "PUC), external training requirements, and policy documents. Does NOT "
+    "own operational workflows or metering."
+  ),
+  'it_metering': (
+    "Telemetry, metering, and operational data pipelines. Owns changes "
+    "that affect data feeds, meter configuration, telemetry cadence, "
+    "data-element specifications in operational submissions, and the "
+    "underlying systems that produce them. Does NOT own commercial market "
+    "operations or external filings."
+  ),
+}
+
+
+def _build_recommended_action_rubric() -> str:
+  lines = [
+    'Recommended-action rubric. Pick exactly one.',
+    '',
+  ]
+  for name, description in RECOMMENDED_ACTIONS.items():
+    lines.append(f'- {name}: {description}')
+  return '\n'.join(lines)
+
+
+def _build_routing_destination_glossary() -> str:
+  lines = [
+    'Routing-destination glossary. Pick the single PRIMARY team '
+    'accountable for the change (multi-destination routing is a known '
+    'v2 extension — TDD §8.6).',
+    '',
+  ]
+  for name, description in ROUTING_DESTINATIONS.items():
+    lines.append(f'- {name}: {description}')
+  return '\n'.join(lines)
+
+
+RECOMMENDED_ACTION_RUBRIC: str = _build_recommended_action_rubric()
+ROUTING_DESTINATION_GLOSSARY: str = _build_routing_destination_glossary()

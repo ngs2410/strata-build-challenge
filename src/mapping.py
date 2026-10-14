@@ -49,7 +49,11 @@ from src.config import (
 )
 from src.llm import CallSpec, PromptSpec
 from src.model_caller import model_caller
-from src.prompt_calibration import CONFIDENCE_LEVEL_RUBRIC
+from src.prompt_calibration import (
+  CONFIDENCE_LEVEL_RUBRIC,
+  RECOMMENDED_ACTION_RUBRIC,
+  ROUTING_DESTINATION_GLOSSARY,
+)
 
 TASK_NAME = 'mapping'
 
@@ -247,14 +251,19 @@ def build_mapping_prompt(
     rubrics=(
       CONFIDENCE_LEVEL_RUBRIC
       + '\n\n'
+      + RECOMMENDED_ACTION_RUBRIC
+      + '\n\n'
+      + ROUTING_DESTINATION_GLOSSARY
+      + '\n\n'
       'Additional rules:\n'
       '- Emit affected_items by 0-based index into the matching candidate '
       'list, NOT by copying the item id string. Index-based selection '
       'prevents id hallucination.\n'
-      '- recommended_action is one of review / amend / no_op.\n'
-      '- routing_destination is one of market_ops / legal / it_metering. '
-      'Pick the single PRIMARY team accountable for the change. Secondary '
-      'teams are not modelled in v1 (TDD §8.6).\n'
+      '- recommended_action is one of review / amend / no_op per the '
+      'rubric above.\n'
+      '- routing_destination is one of market_ops / legal / it_metering '
+      'per the glossary above. Pick the single PRIMARY team accountable '
+      'for the change.\n'
       '- Report confidence as an integer 0-5 per the confidence rubric '
       'above; set confidence_rationale naming the rubric level and why.'
     ),

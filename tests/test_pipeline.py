@@ -687,6 +687,30 @@ def test_extract_obligations_produces_one_entry_per_version():
   assert grounded[0].citation.end_offset == len(llm_extracted[0].citation.citing_span)
 
 
+def test_mapping_prompt_includes_action_and_routing_rubrics():
+  # The mapping prompt must embed RECOMMENDED_ACTION_RUBRIC and
+  # ROUTING_DESTINATION_GLOSSARY so the LLM has concrete decision rules
+  # for picking review/amend/no_op and market_ops/legal/it_metering.
+  # Without these the LLM guesses from the change text's surface tone,
+  # routing by keyword match rather than team ownership.
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  assert 'Recommended-action rubric' in user
+  assert 'Routing-destination glossary' in user
+  # Each action's distinguishing clause is in the rendered prompt.
+  rubrics_section = user.split('## Rubrics')[1].split('## Pitfalls')[0]
+  assert 'concrete update' in rubrics_section  # amend
+  assert 'first-pass human read' in rubrics_section  # review
+  assert 'omitted entirely' in rubrics_section  # no_op
+  # Each team's ownership scope is in the rendered prompt.
+  assert 'wholesale market bidding' in rubrics_section  # market_ops
+  assert 'tariff filings' in rubrics_section  # legal
+  assert 'telemetry' in rubrics_section.lower()  # it_metering
+
+
 def test_mapping_prompt_has_steps_details_pitfalls_sections():
   # Scaffolding parity with the other prompts. The three teaching cases
   # are (a) narrow mapping (SEC Form X-17A-5 — one obligation + one

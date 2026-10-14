@@ -5,7 +5,11 @@ from src.prompt_calibration import (
   CONFIDENCE_LEVELS,
   OBLIGATION_TAXONOMY_REFERENCE,
   OBLIGATION_TYPES,
+  RECOMMENDED_ACTION_RUBRIC,
+  RECOMMENDED_ACTIONS,
   REGULATED_ENTITY_PERSPECTIVE,
+  ROUTING_DESTINATION_GLOSSARY,
+  ROUTING_DESTINATIONS,
 )
 
 
@@ -25,6 +29,45 @@ def test_obligation_taxonomy_reference_names_every_type_and_includes_examples():
   for name, body in OBLIGATION_TYPES.items():
     assert name in OBLIGATION_TAXONOMY_REFERENCE
     assert body['example'] in OBLIGATION_TAXONOMY_REFERENCE
+
+
+def test_recommended_actions_match_mapping_literal():
+  assert set(RECOMMENDED_ACTIONS) == {'review', 'amend', 'no_op'}
+
+
+def test_recommended_action_rubric_names_every_action():
+  for name in RECOMMENDED_ACTIONS:
+    assert name in RECOMMENDED_ACTION_RUBRIC
+
+
+def test_recommended_action_rubric_names_the_decision_rule():
+  # Each action's description must say WHEN to pick it, not just WHAT it
+  # means. Observed failure mode: without a decision rule the LLM picks
+  # amend/review interchangeably based on surface tone of the change.
+  assert 'match_confidence' in RECOMMENDED_ACTIONS['no_op']
+  assert 'first-pass human read' in RECOMMENDED_ACTIONS['review']
+  assert 'concrete update' in RECOMMENDED_ACTIONS['amend']
+  # When uncertain, prefer review — the queue's safety default.
+  assert 'prefer review' in RECOMMENDED_ACTIONS['amend']
+
+
+def test_routing_destinations_match_mapping_literal():
+  assert set(ROUTING_DESTINATIONS) == {'market_ops', 'legal', 'it_metering'}
+
+
+def test_routing_destination_glossary_names_every_destination():
+  for name in ROUTING_DESTINATIONS:
+    assert name in ROUTING_DESTINATION_GLOSSARY
+
+
+def test_routing_destination_glossary_defines_each_team_scope():
+  # Each team must describe what it owns AND what it doesn't own. The
+  # "Does NOT own" clause is the key signal — without it the LLM routes
+  # by keyword match ("tariff" → legal, "DER" → market_ops, "meter" →
+  # it_metering) without principled handoff.
+  for description in ROUTING_DESTINATIONS.values():
+    assert 'Owns' in description
+    assert 'Does NOT own' in description
 
 
 def test_obligation_taxonomy_reference_embeds_regulated_entity_perspective():

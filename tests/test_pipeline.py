@@ -568,6 +568,22 @@ def test_verify_citations_mixed_pending_and_failed_sides_preserves_failed_side()
   )
 
 
+def test_obligation_extraction_rubrics_contains_only_taxonomy_and_confidence():
+  # Rubrics is just OBLIGATION_TAXONOMY_REFERENCE + CONFIDENCE_LEVEL_RUBRIC.
+  # The old "Additional rules" subsection was duplicated across Steps and
+  # Field Intents, so it was removed in favour of a single source. The
+  # critical "no numeric offsets" rule is preserved in Field Intents.
+  version = _version('draft', 'nopr')
+  prompt = build_obligation_extraction_prompt(version)
+  _, user = prompt.render()
+  rubrics_section = user.split('## Rubrics')[1].split('## Pitfalls')[0]
+  assert 'Additional rules' not in rubrics_section
+  # Field Intents preserves the no-numeric-offsets correctness rule.
+  field_intents_section = user.split('## Field Intents')[1].split('## JSON Output Example')[0]
+  assert 'numeric offsets' in field_intents_section
+  assert 'grounding is done deterministically by Python' in field_intents_section
+
+
 def test_obligation_extraction_prompt_names_regulator_side_filter():
   # The perspective rule is baked into OBLIGATION_TAXONOMY_REFERENCE
   # (via prompt_calibration) AND reinforced by a concrete Example 4 +

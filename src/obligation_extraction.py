@@ -178,23 +178,7 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       'applies to extraction as well as classification: Strata tracks '
       'the regulated entity\'s duties, not the regulator\'s.'
     ),
-    rubrics=(
-      OBLIGATION_TAXONOMY_REFERENCE
-      + '\n\n'
-      + CONFIDENCE_LEVEL_RUBRIC
-      + '\n\n'
-      'Additional rules:\n'
-      '- One LlmExtractedObligation per discrete obligation (see '
-      'Examples 1 and 2 for the split-vs-group boundary).\n'
-      '- obligation_type is one of reporting / operational / procedural / '
-      'financial per the taxonomy above.\n'
-      '- citing_span is the SHORTEST verbatim substring from the cited '
-      'passage that establishes this obligation — character-for-character '
-      'copy. Do NOT paraphrase, summarise, truncate mid-word, or include '
-      'surrounding paragraph context. Do NOT count characters or emit '
-      'numeric offsets — grounding is done deterministically by Python '
-      'after this call. See Example 3.'
-    ),
+    rubrics=OBLIGATION_TAXONOMY_REFERENCE + '\n\n' + CONFIDENCE_LEVEL_RUBRIC,
     pitfalls=(
       '- Do NOT extract a REGULATOR-side duty as an obligation of the '
       'regulated entity. "The Commission shall...", "FinCEN shall...", '
@@ -231,7 +215,9 @@ def build_obligation_extraction_prompt(version: ProceedingVersion) -> PromptSpec
       '- citation.citing_span: SHORTEST verbatim substring from the '
       'cited passage that establishes this obligation. '
       'Character-for-character copy; do not paraphrase, summarise, or '
-      'include surrounding context.\n'
+      'include surrounding context. Do NOT count characters or emit '
+      'numeric offsets — grounding is done deterministically by Python '
+      'after this call.\n'
       '- confidence: integer 0-5 per the confidence rubric above.\n'
       '- confidence_rationale: one sentence naming the rubric level you '
       'picked and why.\n'

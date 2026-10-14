@@ -2050,6 +2050,49 @@ decision (e.g., "serve all MISO aggregators as one deployment")
 that pushes the amortisation value past the wedge-stage
 engineering investment.
 
+### 8.10 Multi-user concurrency control
+
+_Mirrors [PRD §6 bullet "Multi-user web UI"](PRD.md#6-non-goals-for-v1)._
+
+**State.** v1 is single-user. `tenant_id` is a query parameter (no
+auth, see §4 Security Decisions), the review-queue page is
+server-rendered per request, and the JSON stores take no locks — the
+single process is the only writer, and the only user is Rachel.
+`POST /queue/{review_item_id}/decide` hardcodes `actor` to Rachel's
+identity (see §6.2 v1).
+
+**Open.** Rachel's actual team at Verdant has three analysts
+([PRD §1](PRD.md#1-the-user)). In a production deployment they would
+plausibly all operate against the same review queue, which the
+current implementation does not support. Specific race conditions:
+
+- Two analysts simultaneously `POST /decide` the same (change ×
+  asset) pair — last-write-wins silently; the audit log records both
+  events but the `AssetDecision` reflects only the second writer, so
+  one analyst's intent is lost without warning.
+- Analyst A loads the queue at T; analyst B decides a pair at T+1;
+  A then bulk-decides including the stale pair — A's POST overwrites
+  B's fresh decision.
+- The `_fold_status` read over `AssetDecision` (see
+  `src/review_queue.py`) is not isolated from concurrent writes —
+  intermediate half-folded `ReviewItem.status` values can be
+  observed.
+
+**Next move.** The data-model foundation is in place:
+`AuditEvent.actor` serialises every state transition (§2.7). Missing
+layer: (a) OIDC / SSO to identify the analyst (§4 Security Decisions
+already names this as the production shape); (b) optimistic
+concurrency on `AssetDecision` writes via an `expected_version`
+field checked at commit time, or pessimistic `SELECT ... FOR UPDATE`
+once the store is Postgres (§7 Scaling Pathway, Persistence row);
+(c) a short-lived "reviewing" marker with TTL as presence indicator;
+(d) WebSocket push to invalidate stale queue views (§6.2 Production
+already names this).
+
+**Trigger.** First tenant onboarded with more than one named
+reviewer, OR first observed last-write-wins incident in Rachel's own
+operation (two tabs → two decisions).
+
 ---
 
 ## Appendix: Technology Choices

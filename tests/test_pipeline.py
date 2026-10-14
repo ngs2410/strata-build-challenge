@@ -26,7 +26,7 @@ from src.config import (
   Passage,
   ProceedingVersion,
 )
-from src.mapping import map_change
+from src.mapping import build_mapping_prompt, map_change
 from src.obligation_extraction import build_obligation_extraction_prompt, extract_obligations
 from src.pipeline import run_pipeline
 from src.review_queue import enqueue_mapping
@@ -685,6 +685,34 @@ def test_extract_obligations_produces_one_entry_per_version():
   assert len(grounded) == 1
   assert grounded[0].citation.start_offset == 0
   assert grounded[0].citation.end_offset == len(llm_extracted[0].citation.citing_span)
+
+
+def test_mapping_prompt_has_steps_details_pitfalls_sections():
+  # Scaffolding parity with the other prompts. The three teaching cases
+  # are (a) narrow mapping (SEC Form X-17A-5 — one obligation + one
+  # document), (b) empty mapping (HIPAA training — no_op for a utility
+  # tenant), (c) fan-out mapping (FinCEN CTR tightening — four affected
+  # items across types, with topical-adjacency misses omitted).
+  change = _change('tightened')
+  prompt = build_mapping_prompt(
+    change, obligations=[], projects=[], documents=[], candidate_set_size=50
+  )
+  _, user = prompt.render()
+  assert '## Steps' in user
+  assert '## Details' in user
+  assert '## Pitfalls' in user
+  details_section = user.split('## Details')[1].split('## Rubrics')[0]
+  # Adjacent-domain examples — not Order 2222 (don't teach to test).
+  assert 'X-17A-5' in details_section  # SEC Example 1
+  assert 'HIPAA' in details_section or 'HHS' in details_section  # HHS Example 2
+  assert 'CTR' in details_section  # FinCEN Example 3
+  assert 'DER aggregator' not in details_section  # Order 2222 teach-to-test guard
+  # Pitfalls name the four failure modes.
+  pitfalls_section = user.split('## Pitfalls')[1].split('## Field Intents')[0]
+  assert 'topically adjacent' in pitfalls_section
+  assert 'match_confidence' in pitfalls_section
+  assert 'amend' in pitfalls_section
+  assert 'routing_destination' in pitfalls_section
 
 
 @pytest.mark.parametrize(

@@ -330,7 +330,8 @@ Script flags: all the main_detect_changes flags above plus
 
 Top-level directories: [`src/`](src), [`config/`](config),
 [`data/`](data), [`templates/`](templates), [`static/`](static),
-[`scripts/`](scripts), [`tests/`](tests). Entry points to open first:
+[`scripts/`](scripts), [`tests/`](tests), [`docs/`](docs),
+[`images/`](images). Entry points to open first:
 [`src/pipeline.py`](src/pipeline.py) (orchestrator),
 [`src/config.py`](src/config.py) (every Pydantic model),
 [`src/model_caller.py`](src/model_caller.py) (LLM dispatch chokepoint).
@@ -362,7 +363,8 @@ src/                          Library code
 config/
   default_domain_config.json  Baseline DomainConfig
 data/
-  tenants/verdant_grid/       FERC Order 2222 excerpts + company context
+  tenants/verdant_grid/       FERC Order 2222 excerpts + company context +
+                              committed prod/ demo snapshot (see Demo snapshot section)
   evals/gold.json             Hand-labelled gold set
 templates/
   _base.html                  Shared layout (sidebar, breadcrumb, slots)
@@ -372,6 +374,10 @@ static/
   strata.css                  Review UI stylesheet
 scripts/                      CLI entry points (main_*.py)
 tests/                        Pytest tests (network-free; stub backend)
+docs/
+  eval-results/               Committed eval-report markdowns + reading guide
+                              (regenerate via `make eval-report`)
+images/                       Screenshots embedded in README (review queue, audit log)
 ```
 
 Every TDD section carries an inline `_Source: ..._` link to the exact
